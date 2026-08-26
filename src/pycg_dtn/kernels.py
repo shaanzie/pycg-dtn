@@ -19,13 +19,13 @@ NAIF_ROOT = "https://naif.jpl.nasa.gov/pub/naif/generic_kernels"
 
 
 class KernelError(RuntimeError):
-    # Raised when a kernel cannot be fetched, or does not cover what it should.
-    pass
+    """Raised when a kernel cannot be fetched, or does not cover what it should."""
 
 
 @dataclass(frozen=True)
 class Kernel:
-    # One SPICE kernel file in NAIF's generic archive.
+    """One SPICE kernel file in NAIF's generic archive."""
+
     filename: str
     path: str  
     purpose: str
@@ -74,7 +74,7 @@ SYSTEM_SPK: dict[int, Kernel] = {
 def required_for(
     celestials: list[Celestial], satellites: list | None = None
 ) -> list[Kernel]:
-    # The kernels needed to place every one of ``celestials`` in space.
+    """The kernels needed to place every one of ``celestials`` in space."""
     kernels = [LSK, PCK, PLANETS]
 
     if satellites:
@@ -112,7 +112,7 @@ _CA_CANDIDATES = (
 
 
 def _ca_bundle() -> str | bool:
-    # Pick a usable CA bundle, falling back to whatever requests defaults to.
+    """Pick a usable CA bundle, falling back to whatever requests defaults to."""
     for path in _CA_CANDIDATES:
         if path and Path(path).is_file():
             return path
@@ -134,7 +134,7 @@ def download(
     verify: str | bool | None = None,
     progress: bool = True,
 ) -> Path:
-    # Stream one kernel to ``kernel_dir``, skipping it if already complete.
+    """Stream one kernel to ``kernel_dir``, skipping it if already complete."""
     kernel_dir = Path(kernel_dir)
     kernel_dir.mkdir(parents=True, exist_ok=True)
     dest = kernel_dir / kernel.filename
@@ -186,7 +186,7 @@ def fetch(
     *,
     progress: bool = True,
 ) -> list[Path]:
-    # Download every kernel in ``kernels`` that is not already present.
+    """Download every kernel in ``kernels`` that is not already present."""
     verify = _ca_bundle()
     return [
         download(k, kernel_dir, verify=verify, progress=progress) for k in kernels
@@ -195,7 +195,7 @@ def fetch(
 
 
 def furnish(kernels: list[Kernel], kernel_dir: Path) -> None:
-    # Load the kernels into the SPICE subsystem.
+    """Load the kernels into the SPICE subsystem."""
     kernel_dir = Path(kernel_dir)
     for kernel in kernels:
         path = kernel_dir / kernel.filename
@@ -210,7 +210,7 @@ def furnish(kernels: list[Kernel], kernel_dir: Path) -> None:
 def verify_coverage(
     celestials: list[Celestial], kernels: list[Kernel], kernel_dir: Path
 ) -> None:
-    # Check the required SPKs actually contain every requested body.
+    """Check the required SPKs actually contain every requested body."""
     kernel_dir = Path(kernel_dir)
     covered: set[int] = set()
     for kernel in kernels:

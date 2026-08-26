@@ -16,13 +16,13 @@ _SYNTHETIC_ID_BASE = -900000
 
 
 class SatelliteError(ValueError):
-    # Raised for malformed orbital elements, or an unusable central body.
-    pass
+    """Raised for malformed orbital elements, or an unusable central body."""
 
 
 @dataclass(frozen=True)
 class KeplerianElements:
-    # A classical two-body orbit about ``central``.
+    """A classical two-body orbit about ``central``."""
+
     
 
     central: str
@@ -66,7 +66,7 @@ class KeplerianElements:
             ) from exc
 
     def GravitationalParameter(self) -> float:
-        # km^3/s^2, from gm_de440.tpc, which must already be loaded
+        """km^3/s^2, from gm_de440.tpc, which must already be loaded"""
         body = self.CentralBody()
         try:
             return float(sp.bodvrd(body.name, "GM", 1)[1][0])
@@ -119,7 +119,8 @@ class KeplerianElements:
 
 @dataclass(frozen=True)
 class Satellite:
-    # An artificial body in the contact graph, propagated from ``elements``.
+    """An artificial body in the contact graph, propagated from ``elements``."""
+
 
     name: str
     naif_id: int

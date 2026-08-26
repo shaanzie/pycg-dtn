@@ -27,7 +27,7 @@ def _sample_epochs(sat: Satellite, t0: float, t1: float) -> np.ndarray:
 
 
 def write_spk(sat: Satellite, t0: float, t1: float, path: str | Path) -> Path:
-    # Propagate sat across [t0, t1] and write it as a type 5 SPK.
+    """Propagate sat across [t0, t1] and write it as a type 5 SPK."""
     if t1 <= t0:
         raise SatelliteError(f"empty span for {sat.name}: {t0} -> {t1}")
 
@@ -66,7 +66,7 @@ def write_spk(sat: Satellite, t0: float, t1: float, path: str | Path) -> Path:
 
 
 class SatelliteEphemerides:
-    # Scratch SPKs for a set of satellites
+    """Scratch SPKs for a set of satellites"""
 
     def __init__(self, satellites: list[Satellite]) -> None:
         self._satellites = list(satellites)

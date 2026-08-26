@@ -28,12 +28,11 @@ DEFAULT_START_UTC = "2026-01-01T00:00:00"
 
 
 class ContactGraphError(RuntimeError):
-    # Raised when the graph is not in a state that can be generated from.
-    pass
+    """Raised when the graph is not in a state that can be generated from."""
 
 
 class ContactGraph:
-    # A scenario under construction: its nodes, its radio, its geometry.
+    """A scenario under construction: its nodes, its radio, its geometry."""
     def __init__(
         self,
         *,
@@ -49,7 +48,7 @@ class ContactGraph:
         self._furnished = False
 
     def AddCelestial(self, name: str, *, eid: str | None = None) -> Celestial:
-        # Add a natural body, a planet, a moon, or the Sun as a node.
+        """Add a natural body, a planet, a moon, or the Sun as a node."""
         body = resolve(name, eid=eid)
 
         for existing in self._celestials:
@@ -77,7 +76,7 @@ class ContactGraph:
         epoch_utc: str = DEFAULT_START_UTC,
         eid: str | None = None,
     ) -> Satellite:
-        # Add an artificial satellite orbiting central.
+        """Add an artificial satellite orbiting central."""
         if (semi_major_axis_km is None) == (altitude_km is None):
             raise SatelliteError(
                 f"{name}: give exactly one of semi_major_axis_km or altitude_km"
@@ -124,23 +123,23 @@ class ContactGraph:
             return float(max(sp.bodvrd(body.name, "RADII", 3)[1]))
 
     def GetCelestials(self) -> list[Celestial]:
-        # The natural bodies currently in the graph, in the order they were added.
+        """The natural bodies currently in the graph, in the order they were added."""
         return list(self._celestials)
 
     def GetSatellites(self) -> list[Satellite]:
-        # The artificial satellites currently in the graph.
+        """The artificial satellites currently in the graph."""
         return list(self._satellites)
 
     def GetNodes(self) -> list:
-        # Every node the graph will evaluate, natural and artificial alike.
+        """Every node the graph will evaluate, natural and artificial alike."""
         return list(self._celestials) + list(self._satellites)
 
     def GetLinks(self) -> list[tuple]:
-        # Every unordered pair of nodes, the links the graph will evaluate.
+        """Every unordered pair of nodes, the links the graph will evaluate."""
         return list(combinations(self.GetNodes(), 2))
 
     def _OcculterCandidates(self, nodes: list) -> list:
-        # Nodes, plus any central body that is not itself a node.
+        """Nodes, plus any central body that is not itself a node."""
         bodies = list(nodes)
         seen = {b.naif_id for b in bodies}
         for sat in self._satellites:
@@ -150,53 +149,53 @@ class ContactGraph:
         return bodies
 
     def LinkKind(self, a: Celestial, b: Celestial) -> str:
-        # "intra" if both endpoints share a time domain, else "inter".
+        """"intra" if both endpoints share a time domain, else "inter"."""
         return "intra" if a.domain == b.domain else "inter"
 
     def GetLinkBudget(self) -> LinkBudget:
-        # The link budget, mutable in place through its own setters.
+        """The link budget, mutable in place through its own setters."""
         return self._link_budget
 
     def SetLinkBudget(self, budget: LinkBudget) -> ContactGraph:
-        # Replace the link budget wholesale.
+        """Replace the link budget wholesale."""
         if not isinstance(budget, LinkBudget):
             raise TypeError("SetLinkBudget expects a LinkBudget instance")
         self._link_budget = budget
         return self
 
     def GetGeometry(self) -> GeometryConfig:
-        # The geometry configuration, mutable in place through its setters.
+        """The geometry configuration, mutable in place through its setters."""
         return self._geometry
 
     def SetGeometry(self, config: GeometryConfig) -> ContactGraph:
-        # Replace the geometry configuration wholesale.
+        """Replace the geometry configuration wholesale."""
         if not isinstance(config, GeometryConfig):
             raise TypeError("SetGeometry expects a GeometryConfig instance")
         self._geometry = config
         return self
 
     def GetKernelDir(self) -> Path:
-        # Where SPICE kernels are cached.
+        """Where SPICE kernels are cached."""
         return self._kernel_dir
 
     def SetKernelDir(self, path: str | Path) -> ContactGraph:
-        # Set the kernel cache directory.
+        """Set the kernel cache directory."""
         self._kernel_dir = Path(path)
         self._furnished = False
         return self
 
     def RequiredKernels(self) -> list[kern.Kernel]:
-        # The kernels this set of bodies needs, without downloading anything.
+        """The kernels this set of bodies needs, without downloading anything."""
         return kern.required_for(self._celestials, self._satellites)
 
     def FetchKernels(self, *, progress: bool = True) -> list[Path]:
-        # Download whatever kernels are missing from the kernel directory.
+        """Download whatever kernels are missing from the kernel directory."""
         if not self._celestials and not self._satellites:
             raise ContactGraphError("add at least one body first")
         return kern.fetch(self.RequiredKernels(), self._kernel_dir, progress=progress)
 
     def LoadKernels(self) -> None:
-        # Load the required kernels into SPICE and confirm they cover the bodies.
+        """Load the required kernels into SPICE and confirm they cover the bodies."""
         if self._furnished:
             return
         required = self.RequiredKernels()
@@ -213,7 +212,7 @@ class ContactGraph:
         fetch: bool = True,
         progress: bool = True,
     ) -> ContactPlan:
-        # Compute the contact plan over days days from start.
+        """Compute the contact plan over days days from start."""
         nodes = self.GetNodes()
         if len(nodes) < 2:
             raise ContactGraphError(
@@ -351,7 +350,7 @@ class ContactGraph:
     def _subdivide(
         self, a: Celestial, b: Celestial, start: float, stop: float
     ) -> list[Contact]:
-        # Cut one visibility interval into sub-contacts of near-constant rate.
+        """Cut one visibility interval into sub-contacts of near-constant rate."""
         cfg = self._geometry
         budget = self._link_budget
 

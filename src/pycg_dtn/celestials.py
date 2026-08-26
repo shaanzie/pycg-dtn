@@ -28,23 +28,16 @@ SYSTEM_NAMES = {
 
 
 class UnknownCelestialBodyError(ValueError):
-    # Raised when SPICE has no ID code for the requested body name.
-    pass
+    """Raised when SPICE has no ID code for the requested body name."""
 
 
 @dataclass(frozen=True)
 class Celestial:
     """A natural body participating in the contact graph.
 
-    Attributes
-    ----------
-    name:
-        SPICE name, upper-cased (``"MARS"``, ``"PHOBOS"``).
-    naif_id:
-        NAIF integer ID code.
-    eid:
-        ION endpoint identifier in the contact plan.  Defaults to
-        ``dtn:<lowercase name>``.
+    ``name`` is the SPICE name upper-cased (``"MARS"``, ``"PHOBOS"``),
+    ``naif_id`` its NAIF integer ID code, and ``eid`` the ION endpoint
+    identifier used in the contact plan, defaulting to ``dtn:<lowercase name>``.
     """
 
     name: str
@@ -68,14 +61,14 @@ class Celestial:
 
     @property
     def domain(self) -> str:
-        # Clock/time domain -- bodies in one planetary system share one.
+        """Clock/time domain -- bodies in one planetary system share one."""
         if self.naif_id == SUN_ID:
             return "sun"
         return SYSTEM_NAMES.get(self.system, f"system{self.system}")
 
     @property
     def is_planet(self) -> bool:
-        # True for the ``N99`` codes
+        """True for the ``N99`` codes"""
         return self.naif_id >= 100 and self.naif_id % 100 == 99
 
     def __str__(self) -> str: 
@@ -83,10 +76,10 @@ class Celestial:
 
 
 def resolve(name: str, *, eid: str | None = None) -> Celestial:
-    """
-    Look up one body by name, or by its integer NAIF code given as a string.
-    UnknownCelestialBodyError
-        If SPICE has no entry for the name or code.
+    """Look up one body by name, or by its integer NAIF code given as a string.
+
+    Raises:
+        UnknownCelestialBodyError: If SPICE has no entry for the name or code.
     """
     key = name.strip() if isinstance(name, str) else str(name)
     if not key:

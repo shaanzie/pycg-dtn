@@ -15,7 +15,8 @@ import spiceypy as sp
 
 @dataclass
 class Contact:
-    # One interval of usable connectivity between two nodes.
+    """One interval of usable connectivity between two nodes."""
+
     a: str
     b: str
     a_eid: str
@@ -36,13 +37,14 @@ class Contact:
 
     @property
     def volume_bits(self) -> float:
-        # How much data this contact can carry end to end.
+        """How much data this contact can carry end to end."""
         return self.rate_bps * self.duration_s
 
 
 @dataclass
 class LinkSummary:
-    # Per-link statistics, most usefully the longest outage.
+    """Per-link statistics, most usefully the longest outage."""
+
     a: str
     b: str
     kind: str
@@ -58,7 +60,8 @@ class LinkSummary:
 
 @dataclass
 class ContactPlan:
-    # Everything ``GenerateContactGraph`` produced.
+    """Everything ``GenerateContactGraph`` produced."""
+
     contacts: list[Contact]
     summary: list[LinkSummary]
     start_et: float
@@ -80,7 +83,7 @@ class ContactPlan:
         return sp.et2utc(self.stop_et, "ISOC", 3)
 
     def ForLink(self, a: str, b: str) -> list[Contact]:
-        # Every contact on one link, in either direction, time-ordered.
+        """Every contact on one link, in either direction, time-ordered."""
         want = {a.upper(), b.upper()}
         return sorted(
             (c for c in self.contacts if {c.a, c.b} == want),
@@ -88,12 +91,12 @@ class ContactPlan:
         )
 
     def LongestOutages(self, n: int = 10) -> list[LinkSummary]:
-        # The links with the worst maximum gap, worst first.
+        """The links with the worst maximum gap, worst first."""
         return sorted(self.summary, key=lambda s: -s.t_maxgap_days)[:n]
 
 
     def ToIonCsv(self, path: str | Path) -> Path:
-        # Write an ION contact plan.
+        """Write an ION contact plan."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w") as fh:
@@ -108,7 +111,7 @@ class ContactPlan:
         return path
 
     def ToJson(self, path: str | Path) -> Path:
-        # Write the full plan, metadata included, as JSON.
+        """Write the full plan, metadata included, as JSON."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -123,14 +126,14 @@ class ContactPlan:
         return path
 
     def SummaryToJson(self, path: str | Path) -> Path:
-        # Write the per-link summary as JSON.
+        """Write the per-link summary as JSON."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps([asdict(s) for s in self.summary], indent=2))
         return path
 
     def Write(self, out_dir: str | Path) -> dict[str, Path]:
-        # Write all three outputs into ``out_dir``.
+        """Write all three outputs into ``out_dir``."""
         out_dir = Path(out_dir)
         return {
             "csv": self.ToIonCsv(out_dir / "contactGraph.csv"),

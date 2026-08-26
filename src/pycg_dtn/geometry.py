@@ -25,19 +25,19 @@ from .celestials import Celestial
 AU_KM = 1.495978707e8
 
 def window(start: float, stop: float):
-    # A SPICE window holding the single interval in seconds ET.
+    """A SPICE window holding the single interval in seconds ET."""
     cell = sp.cell_double(2)
     sp.wninsd(start, stop, cell)
     return cell
 
 
 def window_intervals(w) -> list[tuple[float, float]]:
-    # Unpack a SPICE window into a list of (start, stop) pairs.
+    """Unpack a SPICE window into a list of (start, stop) pairs."""
     return [tuple(map(float, sp.wnfetd(w, i))) for i in range(sp.wncard(w))]
 
 
 def window_total(w) -> float:
-    # Total measure of a SPICE window, seconds.
+    """Total measure of a SPICE window, seconds."""
     return sum(float(np.diff(sp.wnfetd(w, i))[0]) for i in range(sp.wncard(w)))
 
 
@@ -56,7 +56,8 @@ def _positive(name: str, value: float) -> float:
 
 
 class GeometryConfig:
-    # Search steps and exclusion thresholds for the visibility computation.
+    """Search steps and exclusion thresholds for the visibility computation."""
+
     __slots__ = (
         "_occult_step_s",
         "_corona_step_s",
@@ -89,77 +90,80 @@ class GeometryConfig:
         self._rate_tolerance = _positive("rate_tolerance", rate_tolerance)
 
     def GetOccultStep(self) -> float:
-        # Occultation search step, seconds.
+        """Occultation search step, seconds."""
         return self._occult_step_s
 
     def SetOccultStep(self, seconds: float) -> GeometryConfig:
-        # Set the occultation search step.
+        """Set the occultation search step."""
         self._occult_step_s = _positive("occult_step_s", seconds)
         return self
 
     def GetCoronaStep(self) -> float:
-        # Solar-conjunction search step, seconds.
+        """Solar-conjunction search step, seconds."""
         return self._corona_step_s
 
     def SetCoronaStep(self, seconds: float) -> GeometryConfig:
-        # Set the solar-conjunction search step
+        """Set the solar-conjunction search step"""
         self._corona_step_s = _positive("corona_step_s", seconds)
         return self
 
     def GetPrefilterStep(self) -> float:
-        # Sampling step for the cheap occulter prefilter, seconds.
+        """Sampling step for the cheap occulter prefilter, seconds."""
         return self._prefilter_step_s
 
     def SetPrefilterStep(self, seconds: float) -> GeometryConfig:
-        # Set the prefilter sampling step.
+        """Set the prefilter sampling step."""
         self._prefilter_step_s = _positive("prefilter_step_s", seconds)
         return self
 
     def GetPrefilterMargin(self) -> float:
-        # Prefilter keep-radius, in multiples of the occulter's own radius.
+        """Prefilter keep-radius, in multiples of the occulter's own radius."""
         return self._prefilter_radii_margin
 
     def SetPrefilterMargin(self, multiples: float) -> GeometryConfig:
-        # Set how close a body must come to a link before it is treated as a
-        # plausible occulter.
+        """Set how close a body must come to a link before it is treated as a
+        plausible occulter.
+        """
         self._prefilter_radii_margin = _positive("prefilter_radii_margin", multiples)
         return self
 
     def GetSepExclusion(self) -> float:
-        # Sun-Earth-probe exclusion angle, degrees.
+        """Sun-Earth-probe exclusion angle, degrees."""
         return self._sep_exclusion_deg
 
     def SetSepExclusion(self, degrees: float) -> GeometryConfig:
-        # Set the solar exclusion angle in degrees.  DSN practice treats links
-        # inside about 3 degrees as unusable.
+        """Set the solar exclusion angle in degrees.  DSN practice treats links
+        inside about 3 degrees as unusable.
+        """
         self._sep_exclusion_deg = _positive("sep_exclusion_deg", degrees)
         return self
 
     def GetCoronaExclusionKm(self) -> float:
-        # The exclusion angle expressed as a miss distance from the Sun, km.
+        """The exclusion angle expressed as a miss distance from the Sun, km."""
         return AU_KM * math.sin(math.radians(self._sep_exclusion_deg))
 
     def GetRateSample(self) -> float:
-        # Spacing at which range and rate are sampled inside a contact, seconds.
+        """Spacing at which range and rate are sampled inside a contact, seconds."""
         return self._rate_sample_s
 
     def SetRateSample(self, seconds: float) -> GeometryConfig:
-        # Set the in-contact rate sampling interval.
+        """Set the in-contact rate sampling interval."""
         self._rate_sample_s = _positive("rate_sample_s", seconds)
         return self
 
     def GetRateTolerance(self) -> float:
-        # Fractional rate drift tolerated before a contact is split.
+        """Fractional rate drift tolerated before a contact is split."""
         return self._rate_tolerance
 
     def SetRateTolerance(self, fraction: float) -> GeometryConfig:
-        # Set how far the data rate may drift within one sub-contact before it
-        # is cut, as a fraction
+        """Set how far the data rate may drift within one sub-contact before it
+        is cut, as a fraction
+        """
         self._rate_tolerance = _positive("rate_tolerance", fraction)
         return self
 
     def AsDict(self) -> dict[str, float]:
-        # All parameters, for embedding in output metadata.
+        """All parameters, for embedding in output metadata."""
         return {
             "occult_step_s": self._occult_step_s,
             "corona_step_s": self._corona_step_s,
@@ -175,7 +179,7 @@ class GeometryConfig:
 def segment_distances(
     p_a: np.ndarray, p_b: np.ndarray, p_c: np.ndarray
 ) -> np.ndarray:
-    # Distance from point C to the segment A->B, vectorised over many epochs.
+    """Distance from point C to the segment A->B, vectorised over many epochs."""
     d = p_b - p_a
     ac = p_c - p_a
     denom = np.einsum("ij,ij->i", d, d)
@@ -190,7 +194,7 @@ def prefilter_occulters(
     t1: float,
     config: GeometryConfig,
 ) -> dict[tuple[str, str], list[Celestial]]:
-    # Cheaply rule out (link, blocker) combinations that can never occult.
+    """Cheaply rule out (link, blocker) combinations that can never occult."""
     ets = np.arange(t0, t1, config.GetPrefilterStep())
     pos = {
         b.name: np.asarray(
@@ -217,7 +221,7 @@ def prefilter_occulters(
 def occultation_window(
     a: Celestial, b: Celestial, occulter: Celestial, cnfine, config: GeometryConfig
 ):
-    # Times within ``cnfine`` when ``occulter`` hides ``b`` from ``a``.
+    """Times within ``cnfine`` when ``occulter`` hides ``b`` from ``a``."""
     return sp.gfoclt(
         "ANY",
         occulter.name,
@@ -235,7 +239,7 @@ def occultation_window(
 
 
 def corona_window(a: Celestial, b: Celestial, cnfine, config: GeometryConfig):
-    # Times within ``cnfine`` when the a->b path passes too close to the Sun.
+    """Times within ``cnfine`` when the a->b path passes too close to the Sun."""
     threshold = config.GetCoronaExclusionKm()
 
     def closest_solar_approach(et: float) -> float:
