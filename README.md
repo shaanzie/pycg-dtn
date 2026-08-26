@@ -197,13 +197,11 @@ The central body does not have to be a node — it still occults its own orbiter
 
 ## Citing
 
-If you use PyCG-DTN in published work, please cite it. On GitHub, the **Cite
-this repository** button in the sidebar generates APA or BibTeX from
-[`CITATION.cff`](CITATION.cff). Or use:
+If you use PyCG-DTN in published work, please cite it.
 
 ```bibtex
 @software{lagwankar_pycg_dtn,
-  author  = {Lagwankar, Ishaan},
+  author  = {Lagwankar, Ishaan and Klevering, Griffin},
   title   = {{PyCG-DTN}: {DTN} contact graphs for deep-space networks
              from {SPICE} ephemerides},
   version = {1.0.0},

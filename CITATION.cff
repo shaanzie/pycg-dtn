@@ -7,6 +7,10 @@ authors:
     given-names: Ishaan
     email: lagwanka@msu.edu
     affiliation: Michigan State University
+  - family-names: Klevering
+    given-names: Griffin
+    email: kleveri2@msu.edu
+    affiliation: Michigan State University
 version: 1.0.0
 date-released: "2026-08-26"
 license: GPL-3.0-or-later
