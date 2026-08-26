@@ -1,5 +1,8 @@
 # PyCG-DTN
 
+[![Documentation](https://readthedocs.org/projects/pycg-dtn/badge/?version=latest)](https://pycg-dtn.readthedocs.io/en/latest/)
+[![PyPI](https://img.shields.io/pypi/v/pycg-dtn)](https://pypi.org/project/pycg-dtn/)
+
 Build DTN contact graphs for deep-space networks from real ephemerides.
 
 Give it a set of bodies and a number of days. It works out which SPICE kernels it
@@ -31,6 +34,8 @@ pip install pycg-dtn
 ```
 
 Requires Python 3.10+.
+
+Full documentation: **[pycg-dtn.readthedocs.io](https://pycg-dtn.readthedocs.io/)**
 
 ## What it computes
 
