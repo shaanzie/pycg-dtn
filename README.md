@@ -12,7 +12,7 @@ from pycg_dtn import ContactGraph
 cg = ContactGraph()
 cg.AddCelestial("Earth")
 cg.AddCelestial("Mars")
-cg.AddCelestial("Phobos")
+cg.AddSatellite("MRO-LIKE", "Mars", altitude_km=400, inclination_deg=93.0)
 
 plan = cg.GenerateContactGraph(days=780)
 plan.Write("out/")
@@ -68,6 +68,31 @@ cg.AddCelestial("401")                      # Phobos, by ID
 ```
 
 An unrecognised name raises `UnknownCelestialBodyError`.
+
+## Satellites
+
+Satellites here are defined by you, as a classical Keplerian orbit about a central body:
+
+```python
+cg.AddSatellite("MRO-LIKE", "Mars", altitude_km=400,
+                eccentricity=0.001, inclination_deg=93.0)
+```
+
+Size the orbit with either `altitude_km` (above the central body's equatorial
+radius) or `semi_major_axis_km`, and give exactly one of them. The rest —
+`eccentricity`, `inclination_deg`, `raan_deg`, `arg_periapsis_deg`,
+`mean_anomaly_deg`, `epoch_utc` — default to a circular orbit at the
+start epoch.
+
+A satellite is a node like any other. It is treated as a point target, so it never occults anything, but
+things certainly occult it, a low orbiter is hidden by its own planet once per
+revolution, which is what dominates its contact plan:
+
+```
+MERCURY   MARS      inter in contact  95.8%   longest outage   4.27 d
+MERCURY   MRO-LIKE  inter in contact  71.5%   longest outage   4.27 d
+MARS      MRO-LIKE  intra in contact 100.0%   longest outage   0.00 d
+```
 
 ## Kernels
 
@@ -159,11 +184,16 @@ pycg build   --bodies Earth Mars --days 780 --out out/
 pycg build   --bodies Earth Mars --days 780 --frequency 32e9 --rx-gain 79
 ```
 
-## Roadmap
+Satellites take a `NAME,CENTRAL,key=value,...` spec and the flag repeats:
 
-`AddSatellite`, for artificial spacecraft supplied as Keplerian orbital elements
-and propagated into the same geometry pipeline, is not implemented yet. It
-currently raises `NotImplementedError`.
+```bash
+pycg build --bodies Earth Mars --days 780 \
+           --satellite RELAY-1,Mars,alt=400,inc=93 \
+           --satellite RELAY-2,Mars,sma=20000,ecc=0.3
+```
+
+Keys are `alt` or `sma` (give one), `ecc`, `inc`, `raan`, `argp`, `ma`, `eid`.
+The central body does not have to be a node — it still occults its own orbiter.
 
 ## License
 

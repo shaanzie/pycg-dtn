@@ -7,6 +7,7 @@ from pycg_dtn import (
     ContactGraphError,
     GeometryConfig,
     LinkBudget,
+    SatelliteError,
     UnknownCelestialBodyError,
 )
 
@@ -57,10 +58,81 @@ def test_link_kind_follows_planetary_system():
     assert cg.LinkKind(mars, earth) == "inter"
 
 
-def test_add_satellite_is_not_implemented_yet():
+def test_add_satellite_becomes_a_node():
     cg = ContactGraph()
-    with pytest.raises(NotImplementedError, match="not implemented yet"):
-        cg.AddSatellite(a=7000.0, e=0.001)
+    cg.AddCelestial("Mars")
+    sat = cg.AddSatellite("SURVEYOR", "Mars", semi_major_axis_km=3800.0)
+    assert sat.name == "SURVEYOR"
+    assert sat.eid == "dtn:surveyor"
+    assert [n.name for n in cg.GetNodes()] == ["MARS", "SURVEYOR"]
+    assert len(cg.GetLinks()) == 1
+
+
+def test_satellite_shares_the_clock_domain_of_its_central_body():
+    cg = ContactGraph()
+    sat = cg.AddSatellite("AREO", "Mars", semi_major_axis_km=3800.0)
+    assert sat.domain == "mars"
+    assert sat.system == 4
+    assert sat.is_artificial
+    assert not sat.is_planet
+
+
+def test_satellite_link_to_its_own_planet_is_intra_domain():
+    cg = ContactGraph()
+    mars = cg.AddCelestial("Mars")
+    sat = cg.AddSatellite("AREO", "Mars", semi_major_axis_km=3800.0)
+    assert cg.LinkKind(mars, sat) == "intra"
+    assert cg.LinkKind(cg.AddCelestial("Earth"), sat) == "inter"
+
+
+def test_satellite_needs_exactly_one_orbit_size():
+    cg = ContactGraph()
+    with pytest.raises(SatelliteError, match="exactly one"):
+        cg.AddSatellite("X", "Mars")
+    with pytest.raises(SatelliteError, match="exactly one"):
+        cg.AddSatellite("X", "Mars", semi_major_axis_km=3800.0, altitude_km=400.0)
+
+
+def test_duplicate_satellite_name_rejected():
+    cg = ContactGraph()
+    cg.AddSatellite("AREO", "Mars", semi_major_axis_km=3800.0)
+    with pytest.raises(SatelliteError, match="already in the graph"):
+        cg.AddSatellite("areo", "Mars", semi_major_axis_km=3900.0)
+
+
+def test_satellites_get_distinct_naif_codes():
+    cg = ContactGraph()
+    a = cg.AddSatellite("A", "Mars", semi_major_axis_km=3800.0)
+    b = cg.AddSatellite("B", "Mars", semi_major_axis_km=3900.0)
+    assert a.naif_id != b.naif_id
+    assert a.naif_id < 0 and b.naif_id < 0
+
+
+def test_satellite_pulls_in_the_gm_kernel_and_its_central_body():
+    cg = ContactGraph()
+    cg.AddSatellite("AREO", "Mars", semi_major_axis_km=3800.0)
+    names = [k.filename for k in cg.RequiredKernels()]
+    assert "gm_de440.tpc" in names
+    assert "mar099s.bsp" in names
+
+
+def test_central_body_occults_its_orbiter_even_when_not_a_node():
+    cg = ContactGraph()
+    cg.AddCelestial("Earth")
+    cg.AddSatellite("RELAY", "Mars", semi_major_axis_km=3800.0)
+
+    nodes = cg.GetNodes()
+    candidates = cg._OcculterCandidates(nodes)
+    assert "MARS" in [b.name for b in candidates]
+    assert [b.name for b in nodes] == ["EARTH", "RELAY"]
+
+
+def test_occulter_candidates_do_not_duplicate_an_existing_node():
+    cg = ContactGraph()
+    cg.AddCelestial("Mars")
+    cg.AddSatellite("RELAY", "Mars", semi_major_axis_km=3800.0)
+    names = [b.name for b in cg._OcculterCandidates(cg.GetNodes())]
+    assert names.count("MARS") == 1
 
 
 def test_generate_needs_at_least_two_nodes():
@@ -89,7 +161,7 @@ def test_required_kernels_needs_no_download(tmp_path):
 
 def test_fetch_requires_a_body(tmp_path):
     cg = ContactGraph(kernel_dir=tmp_path)
-    with pytest.raises(ContactGraphError, match="at least one celestial"):
+    with pytest.raises(ContactGraphError, match="at least one body"):
         cg.FetchKernels()
 
 

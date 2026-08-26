@@ -16,6 +16,13 @@ from .celestials import Celestial, UnknownCelestialBodyError, resolve
 from .geometry import GeometryConfig
 from .linkbudget import C_KM_S, LinkBudget
 from .plan import Contact, ContactPlan, LinkSummary
+from .propagate import SatelliteEphemerides
+from .satellites import (
+    KeplerianElements,
+    Satellite,
+    SatelliteError,
+    synthetic_id,
+)
 
 DEFAULT_START_UTC = "2026-01-01T00:00:00"
 
@@ -55,20 +62,92 @@ class ContactGraph:
         self._celestials.append(body)
         return body
 
-    def AddSatellite(self, *args, **kwargs):
-        # Add an artificial satellite from its orbital elements.
-        raise NotImplementedError(
-            "AddSatellite is not implemented yet; use AddCelestial for natural "
-            "bodies in the meantime."
+    def AddSatellite(
+        self,
+        name: str,
+        central: str,
+        *,
+        semi_major_axis_km: float | None = None,
+        altitude_km: float | None = None,
+        eccentricity: float = 0.0,
+        inclination_deg: float = 0.0,
+        raan_deg: float = 0.0,
+        arg_periapsis_deg: float = 0.0,
+        mean_anomaly_deg: float = 0.0,
+        epoch_utc: str = DEFAULT_START_UTC,
+        eid: str | None = None,
+    ) -> Satellite:
+        # Add an artificial satellite orbiting central.
+        if (semi_major_axis_km is None) == (altitude_km is None):
+            raise SatelliteError(
+                f"{name}: give exactly one of semi_major_axis_km or altitude_km"
+            )
+
+        for existing in self._satellites:
+            if existing.name.upper() == name.upper():
+                raise SatelliteError(f"{name!r} is already in the graph")
+
+        body = resolve(central)
+
+        if altitude_km is not None:
+            radius = self._EquatorialRadius(body)
+            semi_major_axis_km = (radius + altitude_km) / (1.0 - eccentricity)
+
+        elements = KeplerianElements(
+            central=body.name,
+            semi_major_axis_km=semi_major_axis_km,
+            eccentricity=eccentricity,
+            inclination_deg=inclination_deg,
+            raan_deg=raan_deg,
+            arg_periapsis_deg=arg_periapsis_deg,
+            mean_anomaly_deg=mean_anomaly_deg,
+            epoch_utc=epoch_utc,
         )
+        sat = Satellite(
+            name=name.upper(),
+            naif_id=synthetic_id(len(self._satellites)),
+            central=body,
+            elements=elements,
+            eid=eid or "",
+        )
+        self._satellites.append(sat)
+        self._furnished = False
+        return sat
+
+    def _EquatorialRadius(self, body: Celestial) -> float:
+        try:
+            return float(max(sp.bodvrd(body.name, "RADII", 3)[1]))
+        except Exception:
+            small = [kern.LSK, kern.PCK]
+            kern.fetch(small, self._kernel_dir, progress=False)
+            kern.furnish(small, self._kernel_dir)
+            return float(max(sp.bodvrd(body.name, "RADII", 3)[1]))
 
     def GetCelestials(self) -> list[Celestial]:
-        # The bodies currently in the graph, in the order they were added.
+        # The natural bodies currently in the graph, in the order they were added.
         return list(self._celestials)
 
-    def GetLinks(self) -> list[tuple[Celestial, Celestial]]:
+    def GetSatellites(self) -> list[Satellite]:
+        # The artificial satellites currently in the graph.
+        return list(self._satellites)
+
+    def GetNodes(self) -> list:
+        # Every node the graph will evaluate, natural and artificial alike.
+        return list(self._celestials) + list(self._satellites)
+
+    def GetLinks(self) -> list[tuple]:
         # Every unordered pair of nodes, the links the graph will evaluate.
-        return list(combinations(self._celestials, 2))
+        return list(combinations(self.GetNodes(), 2))
+
+    def _OcculterCandidates(self, nodes: list) -> list:
+        # Nodes, plus any central body that is not itself a node.
+        bodies = list(nodes)
+        seen = {b.naif_id for b in bodies}
+        for sat in self._satellites:
+            if sat.central.naif_id not in seen:
+                bodies.append(sat.central)
+                seen.add(sat.central.naif_id)
+        return bodies
 
     def LinkKind(self, a: Celestial, b: Celestial) -> str:
         # "intra" if both endpoints share a time domain, else "inter".
@@ -108,12 +187,12 @@ class ContactGraph:
 
     def RequiredKernels(self) -> list[kern.Kernel]:
         # The kernels this set of bodies needs, without downloading anything.
-        return kern.required_for(self._celestials)
+        return kern.required_for(self._celestials, self._satellites)
 
     def FetchKernels(self, *, progress: bool = True) -> list[Path]:
         # Download whatever kernels are missing from the kernel directory.
-        if not self._celestials:
-            raise ContactGraphError("add at least one celestial body first")
+        if not self._celestials and not self._satellites:
+            raise ContactGraphError("add at least one body first")
         return kern.fetch(self.RequiredKernels(), self._kernel_dir, progress=progress)
 
     def LoadKernels(self) -> None:
@@ -122,7 +201,8 @@ class ContactGraph:
             return
         required = self.RequiredKernels()
         kern.furnish(required, self._kernel_dir)
-        kern.verify_coverage(self._celestials, required, self._kernel_dir)
+        needed = self._celestials + [s.central for s in self._satellites]
+        kern.verify_coverage(needed, required, self._kernel_dir)
         self._furnished = True
 
     def GenerateContactGraph(
@@ -134,10 +214,10 @@ class ContactGraph:
         progress: bool = True,
     ) -> ContactPlan:
         # Compute the contact plan over days days from start.
-        if len(self._celestials) < 2:
+        nodes = self.GetNodes()
+        if len(nodes) < 2:
             raise ContactGraphError(
-                "a contact graph needs at least two nodes; "
-                f"only {len(self._celestials)} added"
+                f"a contact graph needs at least two nodes; only {len(nodes)} added"
             )
         if days <= 0:
             raise ValueError(f"days must be positive, got {days!r}")
@@ -155,14 +235,43 @@ class ContactGraph:
                 f"span   {sp.et2utc(t0, 'ISOC', 0)} -> {sp.et2utc(t1, 'ISOC', 0)}"
                 f"  ({days:.1f} d)"
             )
+
+        ephemerides = SatelliteEphemerides(self._satellites)
+        try:
+            if self._satellites:
+                ephemerides.Build(t0, t1)
+                if progress:
+                    for sat in self._satellites:
+                        period = sat.elements.PeriodSeconds()
+                        print(
+                            f"propagated {sat.name} about {sat.central.name}, "
+                            f"period {period / 60:.1f} min"
+                        )
+
+            return self._Generate(nodes, t0, t1, days, cfg, progress)
+        finally:
+            ephemerides.Cleanup()
+
+    def _Generate(
+        self,
+        nodes: list,
+        t0: float,
+        t1: float,
+        days: float,
+        cfg: GeometryConfig,
+        progress: bool,
+    ) -> ContactPlan:
+        if progress:
             print("prefiltering blocker candidates ...", flush=True)
 
         tic = time.time()
         links = self.GetLinks()
-        candidates = geo.prefilter_occulters(self._celestials, links, t0, t1, cfg)
+        candidates = geo.prefilter_occulters(
+            self._OcculterCandidates(nodes), links, t0, t1, cfg
+        )
         if progress:
             n_kept = sum(len(v) for v in candidates.values())
-            n_possible = len(links) * max(len(self._celestials) - 2, 0)
+            n_possible = len(links) * max(len(nodes) - 2, 0)
             print(
                 f"  {n_kept} plausible (link, blocker) pairs of {n_possible} "
                 f"possible   [{time.time() - tic:.1f}s]"
@@ -227,7 +336,11 @@ class ContactGraph:
             stop_et=t1,
             meta={
                 "span_days": days,
-                "nodes": [b.name for b in self._celestials],
+                "nodes": [b.name for b in nodes],
+                "celestials": [b.name for b in self._celestials],
+                "satellites": {
+                    s.name: s.elements.AsDict() for s in self._satellites
+                },
                 "kernels": [k.filename for k in self.RequiredKernels()],
                 "link_budget": self._link_budget.AsDict(),
                 "geometry": cfg.AsDict(),
@@ -283,6 +396,7 @@ class ContactGraph:
                 seg_i = i
         return pieces
 
-    def __repr__(self) -> str: 
-        names = ", ".join(b.name for b in self._celestials)
-        return f"ContactGraph({len(self._celestials)} nodes: {names})"
+    def __repr__(self) -> str:
+        nodes = self.GetNodes()
+        names = ", ".join(b.name for b in nodes)
+        return f"ContactGraph({len(nodes)} nodes: {names})"

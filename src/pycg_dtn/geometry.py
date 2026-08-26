@@ -42,7 +42,8 @@ def window_total(w) -> float:
 
 
 def max_radius(body: Celestial) -> float:
-    # Longest semi-axis of the body's reference ellipsoid, km.
+    if getattr(body, "is_artificial", False):
+        return 0.0
     return float(max(sp.bodvrd(body.name, "RADII", 3)[1]))
 
 

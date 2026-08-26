@@ -1,9 +1,5 @@
 """
 Command-line front end
-
-    pycg kernels --bodies Earth Mars Phobos     # what would be downloaded
-    pycg fetch   --bodies Earth Mars Phobos     # download them
-    pycg build   --bodies Earth Mars --days 780 --out out/
 """
 
 from __future__ import annotations
@@ -18,6 +14,59 @@ from .geometry import GeometryConfig
 from .graph import DEFAULT_START_UTC, ContactGraph, ContactGraphError
 from .kernels import KernelError
 from .linkbudget import LinkBudget
+from .satellites import SatelliteError
+
+_SAT_KEYS = {
+    "alt": "altitude_km",
+    "altitude_km": "altitude_km",
+    "sma": "semi_major_axis_km",
+    "semi_major_axis_km": "semi_major_axis_km",
+    "ecc": "eccentricity",
+    "eccentricity": "eccentricity",
+    "inc": "inclination_deg",
+    "inclination_deg": "inclination_deg",
+    "raan": "raan_deg",
+    "raan_deg": "raan_deg",
+    "argp": "arg_periapsis_deg",
+    "arg_periapsis_deg": "arg_periapsis_deg",
+    "ma": "mean_anomaly_deg",
+    "mean_anomaly_deg": "mean_anomaly_deg",
+    "eid": "eid",
+}
+
+
+def _parse_satellite(spec: str) -> tuple[str, str, dict]:
+    parts = [p.strip() for p in spec.split(",") if p.strip()]
+    if len(parts) < 3:
+        raise SatelliteError(
+            f"satellite {spec!r} must be NAME,CENTRAL,key=value,... "
+            "for example: RELAY,Mars,alt=400,inc=93"
+        )
+
+    name, central = parts[0], parts[1]
+    kwargs: dict = {}
+    for item in parts[2:]:
+        if "=" not in item:
+            raise SatelliteError(f"satellite {name}: expected key=value, got {item!r}")
+        key, _, value = item.partition("=")
+        key = key.strip().lower()
+        if key not in _SAT_KEYS:
+            raise SatelliteError(
+                f"satellite {name}: unknown option {key!r}; "
+                f"choose from {', '.join(sorted(set(_SAT_KEYS)))}"
+            )
+        canonical = _SAT_KEYS[key]
+        if canonical == "eid":
+            kwargs[canonical] = value.strip()
+        else:
+            try:
+                kwargs[canonical] = float(value)
+            except ValueError as exc:
+                raise SatelliteError(
+                    f"satellite {name}: {key} must be a number, got {value!r}"
+                ) from exc
+
+    return name, central, kwargs
 
 
 def _build_graph(args: argparse.Namespace) -> ContactGraph:
@@ -41,8 +90,14 @@ def _build_graph(args: argparse.Namespace) -> ContactGraph:
     cg = ContactGraph(
         kernel_dir=args.kernel_dir, link_budget=budget, geometry=geometry
     )
-    for name in args.bodies:
+    for name in args.bodies or []:
         cg.AddCelestial(name)
+    for spec in getattr(args, "satellite", None) or []:
+        name, central, kwargs = _parse_satellite(spec)
+        cg.AddSatellite(name, central, **kwargs)
+
+    if not cg.GetNodes():
+        raise ContactGraphError("give at least one --bodies or --satellite")
     return cg
 
 
@@ -90,9 +145,16 @@ def _add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--bodies",
         nargs="+",
-        required=True,
+        default=[],
         metavar="NAME",
         help="celestial bodies to use as nodes, e.g. Earth Mars Phobos",
+    )
+    p.add_argument(
+        "--satellite",
+        action="append",
+        default=[],
+        metavar="SPEC",
+        help="artificial satellite as NAME,CENTRAL,key=value,...",
     )
     p.add_argument(
         "--kernel-dir",
@@ -159,7 +221,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except (UnknownCelestialBodyError, KernelError, ContactGraphError) as exc:
+    except (
+        UnknownCelestialBodyError,
+        KernelError,
+        ContactGraphError,
+        SatelliteError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:  

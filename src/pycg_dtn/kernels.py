@@ -46,6 +46,11 @@ PCK = Kernel(
     "pck00011.tpc", "pck", "body radii and IAU body-fixed orientation", 0.13
 )
 
+#: Gravitational parameters, needed to propagate a satellite's orbit.
+GM = Kernel(
+    "gm_de440.tpc", "pck", "gravitational parameters (GM) for orbit propagation", 0.012
+)
+
 #: Planetary ephemeris. Covers the Sun, the inner planets, and Earth's Moon.
 PLANETS = Kernel(
     "de440s.bsp",
@@ -66,16 +71,24 @@ SYSTEM_SPK: dict[int, Kernel] = {
 }
 
 
-def required_for(celestials: list[Celestial]) -> list[Kernel]:
+def required_for(
+    celestials: list[Celestial], satellites: list | None = None
+) -> list[Kernel]:
     # The kernels needed to place every one of ``celestials`` in space.
     kernels = [LSK, PCK, PLANETS]
 
+    if satellites:
+        kernels.append(GM)
+
+    # A satellite's central body has to be locatable even if it is not a node
+    bodies = list(celestials) + [s.central for s in satellites or []]
+
     needs_satellites: set[int] = set()
-    for body in celestials:
+    for body in bodies:
         if body.naif_id in PLANETS_PROVIDES:
             continue
         if body.naif_id < 10:
-            continue  
+            continue
         if body.system:
             needs_satellites.add(body.system)
 
