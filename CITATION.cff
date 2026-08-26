@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "PyCG-DTN: DTN contact graphs for deep-space networks from SPICE ephemerides"
+type: software
+authors:
+  - family-names: Lagwankar
+    given-names: Ishaan
+    email: lagwanka@msu.edu
+    affiliation: Michigan State University
+version: 1.0.0
+date-released: "2026-08-26"
+license: GPL-3.0-or-later
+url: "https://github.com/shaanzie/pycg-dtn"
+repository-code: "https://github.com/shaanzie/pycg-dtn"
+repository-artifact: "https://pypi.org/project/pycg-dtn/"
+keywords:
+  - delay-tolerant networking
+  - contact graph
+  - deep space networking
+  - SPICE
+  - NAIF
+  - ephemeris
+  - ION

@@ -195,6 +195,24 @@ pycg build --bodies Earth Mars --days 780 \
 Keys are `alt` or `sma` (give one), `ecc`, `inc`, `raan`, `argp`, `ma`, `eid`.
 The central body does not have to be a node — it still occults its own orbiter.
 
+## Citing
+
+If you use PyCG-DTN in published work, please cite it. On GitHub, the **Cite
+this repository** button in the sidebar generates APA or BibTeX from
+[`CITATION.cff`](CITATION.cff). Or use:
+
+```bibtex
+@software{lagwankar_pycg_dtn,
+  author  = {Lagwankar, Ishaan},
+  title   = {{PyCG-DTN}: {DTN} contact graphs for deep-space networks
+             from {SPICE} ephemerides},
+  version = {1.0.0},
+  year    = {2026},
+  license = {GPL-3.0-or-later},
+  url     = {https://github.com/shaanzie/pycg-dtn}
+}
+```
+
 ## License
 
 GNU General Public License v3.0 or later. See [LICENSE](LICENSE).
