@@ -1,0 +1,34 @@
+# SPICE kernels -- large binaries, fetched on demand from NAIF
+kernels/
+*.bsp
+*.tls
+*.tpc
+*.part
+
+# generated contact plans
+out/
+contactGraph.csv
+contactGraph.json
+summary.json
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# tooling
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# editors / os
+.vscode/
+.idea/
+.DS_Store
