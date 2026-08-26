@@ -12,7 +12,7 @@ from .linkbudget import C_KM_S, LinkBudget
 from .plan import Contact, ContactPlan, LinkSummary
 from .satellites import KeplerianElements, Satellite, SatelliteError
 
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 
 __all__ = [
     "C_KM_S",
