@@ -11,7 +11,7 @@ from .kernels import Kernel, KernelError
 from .linkbudget import C_KM_S, LinkBudget
 from .plan import Contact, ContactPlan, LinkSummary
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __all__ = [
     "C_KM_S",

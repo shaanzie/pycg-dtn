@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "GPL-3.0-or-later"
 license-files = ["LICENSE"]
-authors = [{ name = "Kanishk Lagwankar", email = "lagwanka@msu.edu" }]
+authors = [{ name = "Ishaan Lagwankar", email = "lagwanka@msu.edu" }]
 keywords = [
     "dtn",
     "contact-graph",
