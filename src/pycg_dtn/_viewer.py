@@ -1,0 +1,544 @@
+"""The HTML template for the generated visualizer.
+"""
+
+TEMPLATE = r"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+  :root {
+    --bg: #0a0e17; --panel: #121826; --line: #1f2937; --ink: #e5e7eb;
+    --muted: #8b93a1; --accent: #22d3ee; --warn: #f472b6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink); font: 13px/1.5 ui-sans-serif,
+    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 20px; padding: 10px 16px;
+    border-bottom: 1px solid var(--line); background: var(--panel); flex: none;
+  }
+  h1 { font-size: 13px; margin: 0; font-weight: 600; }
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    padding: 5px 12px; cursor: pointer; color: var(--muted);
+    border: 1px solid transparent; background: none; font: inherit;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.on { background: #1b2436; color: var(--ink); border-color: var(--line); }
+  .spacer { flex: 1; }
+  .clock { font-variant-numeric: tabular-nums; color: var(--muted); }
+  .clock b { color: var(--ink); font-weight: 600; }
+  main { flex: 1; min-height: 0; }
+  .view { display: none; height: 100%; }
+  .view.on { display: flex; }
+
+  aside {
+    width: 260px; flex: none; border-right: 1px solid var(--line);
+    background: var(--panel); overflow-y: auto; padding: 12px;
+  }
+  aside h2 {
+    font-size: 11px; color: var(--muted); margin: 16px 0 6px;
+    font-weight: 600;
+  }
+  aside h2:first-child { margin-top: 0; }
+  .item {
+    display: flex; align-items: center; gap: 8px; padding: 4px 7px;
+    cursor: pointer; border: 1px solid transparent;
+  }
+  .item:hover { background: #1b2436; }
+  .item.on { background: #1b2436; border-color: var(--line); }
+  .dot { width: 8px; height: 8px; flex: none; }
+  .item .nm { flex: 1; overflow: hidden; text-overflow: ellipsis;
+              white-space: nowrap; }
+  .item .sub { color: var(--muted); font-size: 11px; }
+  canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  .stage { flex: 1; position: relative; min-width: 0; }
+  .hint {
+    position: absolute; left: 12px; bottom: 10px; color: var(--muted);
+    font-size: 11px; pointer-events: none;
+  }
+  .hint kbd {
+    border: 1px solid var(--line); padding: 0 4px; font: inherit;
+    color: var(--ink);
+  }
+  .controls {
+    position: absolute; right: 12px; top: 10px; display: flex; gap: 6px;
+  }
+  button.ctl {
+    background: none; color: var(--ink); border: 1px solid var(--line);
+    padding: 3px 10px; cursor: pointer; font: inherit;
+  }
+  button.ctl:hover { background: #1b2436; }
+
+  .tl { flex: 1; overflow: auto; padding: 16px 20px; min-width: 0; }
+  .tl h3 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+  .tl .meta { color: var(--muted); margin-bottom: 16px; }
+  .lane { display: flex; border-top: 1px solid var(--line); }
+  .lane:last-of-type { border-bottom: 1px solid var(--line); }
+  .who {
+    width: 160px; flex: none; padding: 7px 10px 7px 0;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+  }
+  .track { position: relative; flex: 1; min-height: 28px; }
+  .ev { position: absolute; top: 8px; height: 12px; }
+  .ev.tx { background: #2563eb; min-width: 2px; }
+  .ev.rx { width: 2px; background: #34d399; }
+  .ev.drop { width: 2px; background: #f87171; }
+  .axis {
+    display: flex; color: var(--muted); font-size: 11px; padding-top: 6px;
+  }
+  .axis .pad { width: 160px; flex: none; }
+  .axis .ends { flex: 1; display: flex; justify-content: space-between; }
+  .key { color: var(--muted); font-size: 11px; margin: 14px 0 18px; }
+  .key i { display: inline-block; width: 10px; height: 10px; margin-right: 5px;
+           vertical-align: -1px; font-style: normal; }
+  table.hops { border-collapse: collapse; font-size: 12px; width: 100%; }
+  table.hops th {
+    text-align: left; font-weight: 600; color: var(--muted); padding: 4px 14px 4px 0;
+    border-bottom: 1px solid var(--line); font-size: 11px;
+  }
+  table.hops td {
+    padding: 4px 14px 4px 0; border-bottom: 1px solid var(--line);
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px;
+  }
+  .empty { color: var(--muted); padding: 40px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>__TITLE__</h1>
+  <div class="tabs">
+    <button class="tab on" data-view="orbits">Orbits</button>
+    <button class="tab" data-view="bundles">Bundle trace</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="clock">step <b id="stepno">0</b> / <span id="stepmax">0</span>
+    &nbsp;·&nbsp; <b id="stamp"></b> UTC</div>
+</header>
+
+<main>
+  <section class="view on" id="view-orbits">
+    <aside>
+      <h2>Focus</h2>
+      <div id="focuslist"></div>
+      <h2>Contacts now</h2>
+      <div id="contactlist"></div>
+    </aside>
+    <div class="stage">
+      <canvas id="cv"></canvas>
+      <div class="controls">
+        <button class="ctl" id="back">&larr;</button>
+        <button class="ctl" id="fwd">&rarr;</button>
+        <button class="ctl" id="reset">Reset view</button>
+      </div>
+      <div class="hint">
+        <kbd>&rarr;</kbd> advance <kbd>&larr;</kbd> back
+        <kbd>Home</kbd> start &nbsp;·&nbsp; drag to rotate, scroll to zoom
+        &nbsp;·&nbsp; click a satellite for its orbit
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-bundles">
+    <aside>
+      <h2>Bundles</h2>
+      <div id="bundlelist"></div>
+    </aside>
+    <div class="tl" id="timeline"></div>
+  </section>
+</main>
+
+<script>
+const DATA = "__PAYLOAD__";
+
+let step = 0;
+let focusName = "SUN";
+let az = 0.6, el = 0.45, zoom = 1;
+let selected = null;
+const byName = {};
+DATA.bodies.forEach(b => { byName[b.name] = b; });
+
+function world(b, s) {
+  const p = b.pos[Math.min(s, b.pos.length - 1)];
+  if (b.central && byName[b.central]) {
+    const c = world(byName[b.central], s);
+    return [c[0] + p[0], c[1] + p[1], c[2] + p[2]];
+  }
+  return p;
+}
+function worldPt(b, p, s) {
+  if (b.central && byName[b.central]) {
+    const c = world(byName[b.central], s);
+    return [c[0] + p[0], c[1] + p[1], c[2] + p[2]];
+  }
+  return p;
+}
+function rot(p) {
+  const ca = Math.cos(az), sa = Math.sin(az);
+  const x = p[0] * ca - p[1] * sa;
+  const y = p[0] * sa + p[1] * ca;
+  const ce = Math.cos(el), se = Math.sin(el);
+  return [x, y * ce - p[2] * se, y * se + p[2] * ce];
+}
+
+function baseSpan(name) {
+  const moons = DATA.bodies.filter(b => b.central === name);
+  if (moons.length) {
+    let m = 0;
+    moons.forEach(b => b.orbit.forEach(p => {
+      m = Math.max(m, Math.hypot(p[0], p[1], p[2]));
+    }));
+    if (m > 0) return m * 2.6;
+  }
+  if (name === "SUN") {
+    let m = 0;
+    DATA.bodies.forEach(b => {
+      if (b.central) return;
+      b.orbit.forEach(p => { m = Math.max(m, Math.hypot(p[0], p[1], p[2])); });
+    });
+    if (m > 0) return m * 2.3;
+  }
+  const r = (byName[name] && byName[name].radius_km) || 1000;
+  return r * 60;
+}
+
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+let W = 0, H = 0, scale = 1;
+
+function resize() {
+  const r = cv.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, Math.floor(r.width * dpr));
+  cv.height = Math.max(1, Math.floor(r.height * dpr));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  W = r.width; H = r.height;
+  draw();
+}
+function project(p, origin) {
+  const q = rot([p[0] - origin[0], p[1] - origin[1], p[2] - origin[2]]);
+  return [W / 2 + q[0] * scale, H / 2 - q[1] * scale, q[2]];
+}
+
+function drawOrbit(b, origin, sel) {
+  if (!b.orbit.length) return;
+  ctx.beginPath();
+  let started = false;
+  for (const raw of b.orbit) {
+    const p = project(worldPt(b, raw, step), origin);
+    if (!isFinite(p[0]) || !isFinite(p[1])) continue;
+    started ? ctx.lineTo(p[0], p[1]) : (ctx.moveTo(p[0], p[1]), started = true);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = sel ? DATA.meta.satellite_highlight : b.color;
+  ctx.globalAlpha = sel ? 0.95 : 0.3;
+  ctx.lineWidth = sel ? 1.6 : 1;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawBody(d) {
+  const isSat = d.b.kind === "satellite";
+  const trueR = d.b.radius_km * scale;
+  const on = isSat && d.b.name === selected;
+  const r = isSat ? (on ? 5 : 3.5)
+                  : Math.max(2.5, Math.min(trueR, Math.min(W, H) * 0.3));
+  ctx.beginPath();
+  ctx.arc(d.x, d.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = on ? DATA.meta.satellite_highlight : d.b.color;
+  ctx.fill();
+  if (on) {
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.stroke();
+  }
+  ctx.fillStyle = on ? "#ffffff" : "#9aa3b2";
+  ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+  ctx.fillText(d.b.name, d.x + r + 4, d.y + 3);
+}
+
+function draw() {
+  if (!W) return;
+  ctx.clearRect(0, 0, W, H);
+  const origin = byName[focusName] ? world(byName[focusName], step) : [0, 0, 0];
+  scale = (Math.min(W, H) * 0.42) / (baseSpan(focusName) / zoom);
+
+  DATA.bodies.forEach(b => {
+    if (!b.orbit.length) return;
+    if (b.kind === "satellite") return;  
+    drawOrbit(b, origin, false);
+  });
+
+  const act = DATA.active[Math.min(step, DATA.active.length - 1)] || [];
+  act.forEach(i => {
+    const l = DATA.links[i];
+    const A = byName[l.a], B = byName[l.b];
+    if (!A || !B) return;
+    const pa = project(world(A, step), origin);
+    const pb = project(world(B, step), origin);
+    ctx.beginPath();
+    ctx.moveTo(pa[0], pa[1]);
+    ctx.lineTo(pb[0], pb[1]);
+    ctx.strokeStyle = "#34d399";
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  });
+
+  DATA.bodies
+    .filter(b => b.kind !== "satellite")
+    .map(b => {
+      const p = project(world(b, step), origin);
+      return { b, x: p[0], y: p[1], z: p[2] };
+    })
+    .sort((u, v) => u.z - v.z)
+    .forEach(d => drawBody(d));
+
+  DATA.bodies.forEach(b => {
+    if (b.kind !== "satellite") return;
+    if (b.name === selected) drawOrbit(b, origin, true);
+    const p = project(world(b, step), origin);
+    drawBody({ b, x: p[0], y: p[1], z: p[2] });
+  });
+
+  document.getElementById("stepno").textContent = step;
+  document.getElementById("stamp").textContent = DATA.times_utc[step] || "";
+  renderContacts(act);
+}
+
+function renderContacts(act) {
+  const el2 = document.getElementById("contactlist");
+  if (!act.length) {
+    el2.innerHTML = '<div class="sub" style="color:var(--muted)">none</div>';
+    return;
+  }
+  el2.innerHTML = act.map(i => {
+    const l = DATA.links[i];
+    return '<div class="item"><span class="dot" style="background:#34d399">' +
+      '</span><span class="nm">' + l.a + ' &rarr; ' + l.b + '</span></div>';
+  }).join("");
+}
+
+function renderFocus() {
+  const host = document.getElementById("focuslist");
+  host.innerHTML = DATA.bodies.map(b => {
+    const isSat = b.kind === "satellite";
+    const sel = isSat && b.name === selected;
+    const sub = isSat ? (sel ? "shown" : "sat") : (b.node ? "" : "ref");
+    const col = sel ? DATA.meta.satellite_highlight : b.color;
+    return '<div class="item' + (b.name === focusName ? " on" : "") +
+      '" data-focus="' + b.name + '">' +
+      '<span class="dot" style="background:' + col + '"></span>' +
+      '<span class="nm">' + b.name + '</span>' +
+      (sub ? '<span class="sub">' + sub + '</span>' : '') + '</div>';
+  }).join("");
+  host.querySelectorAll("[data-focus]").forEach(n => {
+    n.onclick = () => {
+      const name = n.dataset.focus;
+      if (byName[name] && byName[name].kind === "satellite") {
+        selected = selected === name ? null : name;
+      }
+      focusName = name;
+      zoom = 1;
+      renderFocus();
+      draw();
+    };
+  });
+}
+
+let drag = null, moved = 0;
+cv.addEventListener("mousedown", e => {
+  drag = { x: e.clientX, y: e.clientY }; moved = 0;
+});
+window.addEventListener("mouseup", () => { drag = null; });
+window.addEventListener("mousemove", e => {
+  if (!drag) return;
+  moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y);
+  az += (e.clientX - drag.x) * 0.01;
+  el = Math.max(-1.5, Math.min(1.5, el + (e.clientY - drag.y) * 0.01));
+  drag = { x: e.clientX, y: e.clientY };
+  draw();
+});
+cv.addEventListener("click", e => {
+  if (moved > 4) return;              
+  const r = cv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const origin = byName[focusName] ? world(byName[focusName], step) : [0, 0, 0];
+  let best = null, bd = 14;
+  DATA.bodies.forEach(b => {
+    if (b.kind !== "satellite") return;
+    const p = project(world(b, step), origin);
+    const d = Math.hypot(p[0] - mx, p[1] - my);
+    if (d < bd) { bd = d; best = b.name; }
+  });
+  selected = (best && best === selected) ? null : best;
+  renderFocus();
+  draw();
+});
+cv.addEventListener("wheel", e => {
+  e.preventDefault();
+  zoom *= e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  zoom = Math.max(0.02, Math.min(zoom, 5000));
+  draw();
+}, { passive: false });
+
+function go(n) {
+  step = Math.max(0, Math.min(DATA.meta.n_steps - 1, n));
+  draw();
+}
+document.getElementById("fwd").onclick = () => go(step + 1);
+document.getElementById("back").onclick = () => go(step - 1);
+document.getElementById("reset").onclick = () => {
+  az = 0.6; el = 0.45; zoom = 1; draw();
+};
+window.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") { go(step + 1); e.preventDefault(); }
+  else if (e.key === "ArrowLeft") { go(step - 1); e.preventDefault(); }
+  else if (e.key === "Home") { go(0); e.preventDefault(); }
+  else if (e.key === "End") { go(DATA.meta.n_steps - 1); e.preventDefault(); }
+});
+
+document.querySelectorAll(".tab").forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
+    document.querySelectorAll(".view").forEach(x => x.classList.remove("on"));
+    t.classList.add("on");
+    document.getElementById("view-" + t.dataset.view).classList.add("on");
+    if (t.dataset.view === "orbits") resize();
+  };
+});
+
+function parseUTC(s) {
+  if (!s) return NaN;
+  return Date.parse(/[Zz]|[+-]\d\d:?\d\d$/.test(s) ? s : s + "Z");
+}
+function fmtDur(ms) {
+  const s = ms / 1000;
+  if (s < 90) return s.toFixed(1) + " s";
+  if (s < 5400) return (s / 60).toFixed(1) + " min";
+  if (s < 172800) return (s / 3600).toFixed(1) + " h";
+  return (s / 86400).toFixed(2) + " d";
+}
+
+function renderBundleList() {
+  const host = document.getElementById("bundlelist");
+  const tr = DATA.trace;
+  if (!tr || !tr.bundles || !tr.bundles.length) {
+    host.innerHTML = '<div class="sub" style="color:var(--muted)">' +
+      'no trace loaded</div>';
+    return;
+  }
+  host.innerHTML = tr.bundles.map((b, i) =>
+    '<div class="item" data-b="' + i + '">' +
+    '<span class="dot" style="background:' +
+    (b.delivered ? "#34d399" : "#f87171") + '"></span>' +
+    '<span class="nm">' + b.id + '</span>' +
+    '<span class="sub">' + b.hops.length + '</span></div>').join("");
+  host.querySelectorAll("[data-b]").forEach(n => {
+    n.onclick = () => {
+      host.querySelectorAll(".item").forEach(x => x.classList.remove("on"));
+      n.classList.add("on");
+      renderTimeline(tr.bundles[+n.dataset.b]);
+    };
+  });
+}
+
+function renderTimeline(b) {
+  const host = document.getElementById("timeline");
+  if (!b.hops.length) {
+    host.innerHTML = '<div class="empty">This bundle has no hops.</div>';
+    return;
+  }
+  // One lane per node. A hop puts a send bar on the sender's lane and a
+  // receive mark on the receiver's, so the gap between them is the light time.
+  let lo = Infinity, hi = -Infinity;
+  const rows = b.hops.map(h => {
+    const t0 = parseUTC(h.tx_start_utc);
+    const t1 = parseUTC(h.tx_stop_utc) || t0;
+    const rx = parseUTC(h.rx_utc) || (t1 + (h.owlt_s || 0) * 1000);
+    lo = Math.min(lo, t0); hi = Math.max(hi, rx);
+    return { h, t0, t1, rx };
+  });
+  const span = Math.max(1, hi - lo);
+  const pct = t => ((t - lo) / span) * 100;
+
+  const nodes = [];
+  b.hops.forEach(h => [h.from, h.to].forEach(n => {
+    if (n && nodes.indexOf(n) < 0) nodes.push(n);
+  }));
+
+  const sep = " &nbsp;&middot;&nbsp; ";
+  const head =
+    '<h3>' + b.id + '</h3><div class="meta">' +
+    (b.source || "?") + ' &rarr; ' + (b.destination || "?") + sep +
+    b.hops.length + ' hop' + (b.hops.length === 1 ? "" : "s") + sep +
+    (b.delivered ? "delivered" : "not delivered") + sep +
+    'end to end ' + fmtDur(span) +
+    (b.size_bytes ? sep + (b.size_bytes / 1e6).toFixed(2) + ' MB' : '') +
+    '</div>';
+
+  const lanes = nodes.map(n => {
+    let marks = "";
+    rows.forEach(r => {
+      if (r.h.from === n) {
+        const w = Math.max(0.4, pct(r.t1) - pct(r.t0));
+        marks += '<div class="ev tx" title="sent ' + r.h.tx_start_utc +
+          '" style="left:' + pct(r.t0) + '%;width:' + w + '%"></div>';
+      }
+      if (r.h.to === n) {
+        const bad = r.h.status === "dropped" || r.h.status === "expired";
+        marks += '<div class="ev ' + (bad ? "drop" : "rx") + '" title="' +
+          (bad ? r.h.status : "received") + ' ' +
+          new Date(r.rx).toISOString() + '" style="left:' + pct(r.rx) +
+          '%"></div>';
+      }
+    });
+    return '<div class="lane"><div class="who">' + n + '</div>' +
+      '<div class="track">' + marks + '</div></div>';
+  }).join("");
+
+  const axis = '<div class="axis"><span class="pad"></span>' +
+    '<span class="ends"><span>' +
+    new Date(lo).toISOString().replace(".000Z", "Z") + '</span><span>' +
+    new Date(hi).toISOString().replace(".000Z", "Z") + '</span></span></div>';
+
+  const key = '<div class="key">' +
+    '<i style="background:#2563eb"></i>sent' +
+    '<i style="background:#34d399;margin-left:14px"></i>received' +
+    '<i style="background:#f87171;margin-left:14px"></i>dropped</div>';
+
+  const table = '<table class="hops"><tr><th>#</th><th>from</th><th>to</th>' +
+    '<th>sent</th><th>received</th><th>owlt</th><th>status</th></tr>' +
+    rows.map((r, i) =>
+      '<tr><td>' + (i + 1) + '</td><td>' + (r.h.from || "?") + '</td><td>' +
+      r.h.to + '</td><td>' + r.h.tx_start_utc + '</td><td>' +
+      new Date(r.rx).toISOString().replace(".000Z", "Z") + '</td><td>' +
+      (r.h.owlt_s ? fmtDur(r.h.owlt_s * 1000) : "-") + '</td><td>' +
+      (r.h.status || "forwarded") + '</td></tr>').join("") + '</table>';
+
+  host.innerHTML = head + lanes + axis + key + table;
+}
+
+document.getElementById("stepmax").textContent = DATA.meta.n_steps - 1;
+renderFocus();
+renderBundleList();
+if (DATA.trace && DATA.trace.bundles && DATA.trace.bundles.length) {
+  renderTimeline(DATA.trace.bundles[0]);
+  document.querySelector("#bundlelist .item").classList.add("on");
+} else {
+  document.getElementById("timeline").innerHTML =
+    '<div class="empty">No bundle trace was supplied. Pass ' +
+    '<code>trace=</code> a bundle-trace.json to populate this tab.</div>';
+}
+window.addEventListener("resize", resize);
+resize();
+</script>
+</body>
+</html>
+"""

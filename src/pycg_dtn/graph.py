@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import spiceypy as sp
 
+from . import bundletrace, visualize
 from . import geometry as geo
 from . import kernels as kern
 from .celestials import Celestial, UnknownCelestialBodyError, resolve
@@ -46,6 +47,7 @@ class ContactGraph:
         self._link_budget = link_budget or LinkBudget()
         self._geometry = geometry or GeometryConfig()
         self._furnished = False
+        self._plan: ContactPlan | None = None
 
     def AddCelestial(self, name: str, *, eid: str | None = None) -> Celestial:
         """Add a natural body, a planet, a moon, or the Sun as a node."""
@@ -328,7 +330,7 @@ class ContactGraph:
                     flush=True,
                 )
 
-        return ContactPlan(
+        self._plan = ContactPlan(
             contacts=contacts,
             summary=summary,
             start_et=t0,
@@ -346,6 +348,52 @@ class ContactGraph:
                 "c_km_s": C_KM_S,
             },
         )
+        return self._plan
+
+    def GenerateVisualizer(
+        self,
+        step_size: float,
+        *,
+        out: str | Path = "out/visualizer.html",
+        trace: str | Path | None = None,
+        title: str | None = None,
+        days: float | None = None,
+        start: str = DEFAULT_START_UTC,
+    ) -> Path:
+        """Write a self-contained HTML view of the graph.
+        """
+        plan = self._plan
+        if plan is None:
+            if days is None:
+                raise ContactGraphError(
+                    "no contact plan yet; call GenerateContactGraph() first, "
+                    "or pass days= to generate one here"
+                )
+            plan = self.GenerateContactGraph(days=days, start=start)
+
+        # Orbit periods come from GM, which a satellite-free graph does not load
+        kern.fetch([kern.GM], self._kernel_dir, progress=False)
+        kern.furnish([kern.GM], self._kernel_dir)
+
+        loaded = bundletrace.load(trace) if trace is not None else None
+
+        # Satellite ephemerides are scratch data discarded once a plan is built,
+        # so they have to be rebuilt 
+        ephemerides = SatelliteEphemerides(self._satellites)
+        try:
+            if self._satellites:
+                ephemerides.Build(plan.start_et, plan.stop_et)
+            payload = visualize.build_payload(
+                self,
+                plan,
+                float(step_size),
+                trace=loaded,
+                title=title or f"PyCG-DTN — {len(self.GetNodes())} nodes",
+            )
+        finally:
+            ephemerides.Cleanup()
+
+        return visualize.write(payload, out)
 
     def _subdivide(
         self, a: Celestial, b: Celestial, start: float, stop: float
