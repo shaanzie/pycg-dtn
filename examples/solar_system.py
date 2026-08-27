@@ -18,6 +18,7 @@ for body in ("Mercury", "Venus", "Earth", "Mars"):
 cg.AddSatellite("SATALIGHT", "Earth", altitude_km=800, inclination_deg=98.0)
 
 plan = cg.GenerateContactGraph(days=DAYS, start=START)
+plan.Write(OUT)
 
 ROUTE = [("MERCURY", "VENUS"), ("VENUS", "SATALIGHT"), ("SATALIGHT", "MARS")]
 EID = {n.name: n.eid for n in cg.GetNodes()}
