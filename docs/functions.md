@@ -55,3 +55,17 @@
 .. automodule:: pycg_dtn.propagate
    :members:
 ```
+
+## Bundle trace
+
+```{eval-rst}
+.. automodule:: pycg_dtn.bundletrace
+   :members:
+```
+
+## Visualizer
+
+```{eval-rst}
+.. automodule:: pycg_dtn.visualize
+   :members:
+```

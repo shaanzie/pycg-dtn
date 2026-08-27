@@ -1,29 +1,13 @@
 """
 Bundle traces: where a bundle actually went, hop by hop.
 
-```json
-{
-  "bundles": [
-    {
-      "id": "bundle-0001",
-      "source": "dtn:earth",
-      "destination": "dtn:mro",
-      "created_utc": "2026-01-01T00:00:00",
-      "size_bytes": 1048576,
-      "hops": [
-        {
-          "from": "dtn:earth",
-          "to": "dtn:mars",
-          "tx_start_utc": "2026-01-01T00:00:00",
-          "tx_stop_utc": "2026-01-01T00:04:00",
-          "owlt_s": 1246.3,
-          "status": "forwarded"
-        }
-      ]
-    }
-  ]
-}
-```
+A bundle trace is the record of a routing run over a contact plan, produced by
+ION, ns-3 or your own router. PyCG-DTN reads it back and draws a timeline; it
+does not route.
+
+Only ``id`` and ``hops`` are required per bundle, and only ``to`` and
+``tx_start_utc`` per hop. The full schema is documented at
+https://pycg-dtn.readthedocs.io/en/latest/bundletrace.html
 """
 
 from __future__ import annotations

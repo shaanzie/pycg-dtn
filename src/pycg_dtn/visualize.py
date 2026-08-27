@@ -1,13 +1,5 @@
 """
 A self-contained HTML view of a contact graph.
-
-Positions are sampled in Python and embedded in the page, so the result is a
-single file that opens offline with no server and no network access. Stepping
-through time is an index change, not a recomputation.
-
-Two frames are used, which keeps satellites from being lost to rounding: natural
-bodies are stored relative to the Sun, satellites relative to the body they
-orbit. The page composes the two.
 """
 
 from __future__ import annotations

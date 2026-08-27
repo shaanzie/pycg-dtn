@@ -20,6 +20,14 @@ contactplan
 
 ```{toctree}
 :maxdepth: 2
+:caption: Visualizing
+
+visualizer
+bundletrace
+```
+
+```{toctree}
+:maxdepth: 2
 :caption: Models
 
 geometry
