@@ -11,8 +11,8 @@ authors:
     given-names: Griffin
     email: kleveri2@msu.edu
     affiliation: Michigan State University
-version: 1.5.0
-date-released: "2026-09-15"
+version: 1.6.0
+date-released: "2026-09-16"
 license: GPL-3.0-or-later
 url: "https://github.com/shaanzie/pycg-dtn"
 repository-code: "https://github.com/shaanzie/pycg-dtn"
