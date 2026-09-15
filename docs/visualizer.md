@@ -40,5 +40,17 @@ sat.elements.PeriodSeconds() / 8      # a step that reads smoothly, usually a sy
 Natural bodies are roughly standard colours, the Sun yellow, Earth blue, Mars
 rust. Anything unrecognised falls back to grey, as do satellites until selected.
 
-The Sun is always drawn, and a satellite's central body is included even when
-neither is a node of the graph, since the satellite cannot be placed without it.
+The Sun is always drawn, and the body a node orbits is included even when it is
+not a node of the graph, since the node cannot be placed without it — a
+satellite's central body, a moon's planet, and so on up the chain.
+
+## What orbits what
+
+Each node's orbit is drawn about the body it actually orbits: a moon about its
+planet, a planet about the Sun, a satellite about its central body. So Phobos
+traces a 9,400 km ellipse around Mars rather than Mars's own path around the
+Sun. The Sun itself is drawn without an orbit.
+
+An orbit longer than the plan is still drawn whole — a satellite with a
+year-long period gets a full revolution, not the slice the plan happens to
+cover.

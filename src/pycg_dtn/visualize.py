@@ -13,6 +13,7 @@ import spiceypy as sp
 
 from ._viewer import TEMPLATE
 from .bundletrace import BundleTrace
+from .celestials import resolve
 
 BODY_COLORS = {
     "SUN": "#ffd21e",
@@ -66,12 +67,22 @@ def body_radius_km(node) -> float:
         return 0.0
 
 
+def parent_body(node) -> str:
+    """The body a node visibly orbits: its planet for a moon, else the Sun."""
+    if getattr(node, "is_artificial", False):
+        return node.central.name
+    if node.naif_id > 100 and not node.is_planet:
+        return str(sp.bodc2n(node.system * 100 + 99)).upper()
+    return "SUN"
+
+
 def orbit_period_s(node, et: float) -> float:
     """How long one revolution takes, seconds."""
     if getattr(node, "is_artificial", False):
         return float(node.elements.PeriodSeconds())
-    mu = float(sp.bodvrd("SUN", "GM", 1)[1][0])
-    state = sp.spkezr(node.name, et, "J2000", "NONE", "SUN")[0]
+    parent = parent_body(node)
+    mu = float(sp.bodvrd(parent, "GM", 1)[1][0])
+    state = sp.spkezr(node.name, et, "J2000", "NONE", parent)[0]
     return float(sp.oscltx(state, et, mu)[10])
 
 
@@ -81,11 +92,13 @@ def _positions(name: str, ets: np.ndarray, observer: str) -> np.ndarray:
 
 def orbit_path(node, et: float) -> list[list[float]]:
     """One full revolution, relative to whatever the node orbits."""
+    observer = parent_body(node)
+    if node.name == observer:
+        return []  # the Sun does not orbit itself
     period = orbit_period_s(node, et)
     if not math.isfinite(period) or period <= 0:
         return []
     ets = np.linspace(et, et + period, ORBIT_SAMPLES)
-    observer = node.central.name if getattr(node, "is_artificial", False) else "SUN"
     pts = _positions(node.name, ets, observer)
     return [[round(float(v), 3) for v in p] for p in pts]
 
@@ -138,30 +151,41 @@ def build_payload(
     t0, t1 = plan.start_et, plan.stop_et
     times = _step_times(t0, t1, step_s)
 
-    # A satellite is stored relative to its central body, so that body has to be
-    # in the payload even when it is not a node of the graph
+    # A node is stored relative to the body it orbits, so that body has to be in
+    # the payload even when it is not a node of the graph -- the central body of
+    # a satellite, the planet of a moon, and so on up to the Sun.
     drawn = list(nodes)
     seen = {n.name for n in drawn}
-    for node in nodes:
+    pending = list(nodes)
+    while pending:
+        node = pending.pop()
+        parent = parent_body(node)
+        if parent == node.name or parent in seen:
+            continue
         central = getattr(node, "central", None)
-        if central is not None and central.name not in seen:
-            drawn.append(central)
-            seen.add(central.name)
+        known = central is not None and central.name == parent
+        body = central if known else resolve(parent)
+        drawn.append(body)
+        seen.add(body.name)
+        pending.append(body)
 
     node_names = {n.name for n in nodes}
 
     bodies = []
     for node in drawn:
         artificial = getattr(node, "is_artificial", False)
-        observer = node.central.name if artificial else "SUN"
-        pts = _positions(node.name, times, observer)
+        parent = parent_body(node)
+        # The Sun anchors the frame; everything else is stored relative to its
+        # parent and summed back up the chain by the page.
+        relative = None if parent == node.name or parent == "SUN" else parent
+        pts = _positions(node.name, times, parent)
         bodies.append(
             {
                 "name": node.name,
                 "eid": getattr(node, "eid", ""),
                 "kind": "satellite" if artificial else "celestial",
                 "node": node.name in node_names,
-                "central": node.central.name if artificial else None,
+                "central": relative,
                 "domain": node.domain,
                 "color": body_color(node),
                 "radius_km": round(body_radius_km(node), 3),
