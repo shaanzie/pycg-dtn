@@ -54,3 +54,9 @@ Sun. The Sun itself is drawn without an orbit.
 An orbit longer than the plan is still drawn whole — a satellite with a
 year-long period gets a full revolution, not the slice the plan happens to
 cover.
+
+## Addresses
+
+A third tab lists every node's name next to its `eid` — the orbital IP a
+satellite or celestial got by default, or whatever you passed as `eid=`.
+See {doc}`orbitalid`.

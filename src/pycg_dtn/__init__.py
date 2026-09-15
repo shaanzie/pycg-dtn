@@ -10,6 +10,13 @@ from .geometry import GeometryConfig
 from .graph import ContactGraph, ContactGraphError
 from .kernels import Kernel, KernelError
 from .linkbudget import C_KM_S, LinkBudget
+from .orbital_id import (
+    BP_VERSION,
+    REGIME_BODY,
+    REGIME_SATELLITE,
+    SCHEME_VERSION,
+    BuildEid,
+)
 from .plan import Contact, ContactPlan, LinkSummary
 from .satellites import KeplerianElements, Satellite, SatelliteError
 from .visualize import VisualizerError
@@ -19,6 +26,8 @@ __version__ = "1.6.0"
 __all__ = [
     "VisualizerError",
     "Hop",
+    "BP_VERSION",
+    "BuildEid",
     "BundleTraceError",
     "BundleTrace",
     "Bundle",
@@ -34,6 +43,9 @@ __all__ = [
     "KernelError",
     "LinkBudget",
     "LinkSummary",
+    "REGIME_BODY",
+    "REGIME_SATELLITE",
+    "SCHEME_VERSION",
     "Satellite",
     "SatelliteError",
     "UnknownCelestialBodyError",

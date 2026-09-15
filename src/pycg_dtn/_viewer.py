@@ -123,6 +123,7 @@ TEMPLATE = r"""<!doctype html>
   <div class="tabs">
     <button class="tab on" data-view="orbits">Orbits</button>
     <button class="tab" data-view="bundles">Bundle trace</button>
+    <button class="tab" data-view="addresses">Addresses</button>
   </div>
   <div class="spacer"></div>
   <div class="clock">step <b id="stepno">0</b> / <span id="stepmax">0</span>
@@ -161,6 +162,10 @@ TEMPLATE = r"""<!doctype html>
       <div id="bundlelist"></div>
     </aside>
     <div class="tl" id="timeline"></div>
+  </section>
+
+  <section class="view" id="view-addresses">
+    <div class="tl" id="addresstable"></div>
   </section>
 </main>
 
@@ -554,9 +559,27 @@ function renderTimeline(b) {
   host.innerHTML = head + lanes + axis + key + table;
 }
 
+function renderAddresses() {
+  const host = document.getElementById("addresstable");
+  if (!DATA.bodies.length) {
+    host.innerHTML = '<div class="empty">No nodes in this graph.</div>';
+    return;
+  }
+  const rows = DATA.bodies.map(b =>
+    '<tr><td>' + b.name + '</td><td>' + b.kind + '</td><td>' +
+    (b.domain || "-") + '</td><td>' + (b.eid || "-") + '</td></tr>'
+  ).join("");
+  host.innerHTML =
+    '<h3>Addresses</h3><div class="meta">name to endpoint identifier, ' +
+    DATA.bodies.length + ' node' + (DATA.bodies.length === 1 ? "" : "s") +
+    '</div><table class="hops"><tr><th>name</th><th>kind</th>' +
+    '<th>domain</th><th>eid</th></tr>' + rows + '</table>';
+}
+
 document.getElementById("stepmax").textContent = DATA.meta.n_steps - 1;
 renderFocus();
 renderBundleList();
+renderAddresses();
 if (DATA.trace && DATA.trace.bundles && DATA.trace.bundles.length) {
   renderTimeline(DATA.trace.bundles[0]);
   document.querySelector("#bundlelist .item").classList.add("on");

@@ -66,5 +66,5 @@ def test_is_planet_only_true_for_n99_codes():
 
 
 def test_default_eid_and_override():
-    assert resolve("Mars").eid == "dtn:mars"
+    assert resolve("Mars").eid == "oip://bp7::v1::mars::body::mars"
     assert resolve("Mars", eid="ipn:4.1").eid == "ipn:4.1"
