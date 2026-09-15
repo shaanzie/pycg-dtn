@@ -44,9 +44,15 @@ TEMPLATE = r"""<!doctype html>
   }
   aside h2 {
     font-size: 11px; color: var(--muted); margin: 16px 0 6px;
-    font-weight: 600;
+    font-weight: 600; display: flex; align-items: center;
+    justify-content: space-between;
   }
   aside h2:first-child { margin-top: 0; }
+  .linkctl button {
+    background: none; border: none; color: var(--accent); cursor: pointer;
+    font: inherit; font-weight: 400; padding: 0; margin-left: 8px;
+  }
+  .linkctl button:hover { text-decoration: underline; }
   .item {
     display: flex; align-items: center; gap: 8px; padding: 4px 7px;
     cursor: pointer; border: 1px solid transparent;
@@ -128,7 +134,10 @@ TEMPLATE = r"""<!doctype html>
     <aside>
       <h2>Focus</h2>
       <div id="focuslist"></div>
-      <h2>Contacts now</h2>
+      <h2>Contacts now<span class="linkctl">
+        <button type="button" id="linksAll">all</button>
+        <button type="button" id="linksNone">none</button>
+      </span></h2>
       <div id="contactlist"></div>
     </aside>
     <div class="stage">
@@ -162,6 +171,7 @@ let step = 0;
 let focusName = "SUN";
 let az = 0.6, el = 0.45, zoom = 1;
 let selected = null;
+const selectedLinks = new Set();
 const byName = {};
 DATA.bodies.forEach(b => { byName[b.name] = b; });
 
@@ -276,6 +286,7 @@ function draw() {
 
   const act = DATA.active[Math.min(step, DATA.active.length - 1)] || [];
   act.forEach(i => {
+    if (!selectedLinks.has(i)) return;
     const l = DATA.links[i];
     const A = byName[l.a], B = byName[l.b];
     if (!A || !B) return;
@@ -320,9 +331,19 @@ function renderContacts(act) {
   }
   el2.innerHTML = act.map(i => {
     const l = DATA.links[i];
-    return '<div class="item"><span class="dot" style="background:#34d399">' +
-      '</span><span class="nm">' + l.a + ' &rarr; ' + l.b + '</span></div>';
+    const on = selectedLinks.has(i);
+    return '<div class="item' + (on ? " on" : "") + '" data-link="' + i + '">' +
+      '<span class="dot" style="background:#34d399"></span>' +
+      '<span class="nm">' + l.a + ' &rarr; ' + l.b + '</span></div>';
   }).join("");
+  el2.querySelectorAll("[data-link]").forEach(n => {
+    n.onclick = () => {
+      const i = +n.dataset.link;
+      if (selectedLinks.has(i)) selectedLinks.delete(i);
+      else selectedLinks.add(i);
+      draw();
+    };
+  });
 }
 
 function renderFocus() {
@@ -396,6 +417,14 @@ document.getElementById("fwd").onclick = () => go(step + 1);
 document.getElementById("back").onclick = () => go(step - 1);
 document.getElementById("reset").onclick = () => {
   az = 0.6; el = 0.45; zoom = 1; draw();
+};
+document.getElementById("linksAll").onclick = () => {
+  DATA.links.forEach((_, i) => selectedLinks.add(i));
+  draw();
+};
+document.getElementById("linksNone").onclick = () => {
+  selectedLinks.clear();
+  draw();
 };
 window.addEventListener("keydown", e => {
   if (e.key === "ArrowRight") { go(step + 1); e.preventDefault(); }
