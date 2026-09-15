@@ -167,3 +167,52 @@ def test_visualizer_without_a_plan_explains_itself():
     cg.AddCelestial("Mars")
     with pytest.raises(Exception, match="GenerateContactGraph"):
         cg.GenerateVisualizer(3600)
+
+
+@pytest.mark.network
+def test_a_moon_orbits_its_planet_not_the_sun(mars_kernels, tmp_path):
+    cg = ContactGraph(kernel_dir=mars_kernels)
+    cg.AddCelestial("Mars")
+    cg.AddCelestial("Phobos")
+    cg.GenerateContactGraph(days=1, start="2026-06-01T00:00:00", progress=False)
+
+    data = payload_of(cg.GenerateVisualizer(3600, out=tmp_path / "v.html").read_text())
+    phobos = {b["name"]: b for b in data["bodies"]}["PHOBOS"]
+
+    assert phobos["central"] == "MARS"
+    # Phobos orbits 9,376 km from Mars, not 1.5 astronomical units from the Sun
+    radii = [np.linalg.norm(p) for p in phobos["orbit"]]
+    assert 9_000 < min(radii) and max(radii) < 10_000
+
+
+@pytest.mark.network
+def test_the_sun_is_drawn_without_an_orbit_of_its_own(mars_kernels, tmp_path):
+    cg = ContactGraph(kernel_dir=mars_kernels)
+    cg.AddCelestial("Sun")
+    cg.AddCelestial("Mars")
+    cg.GenerateContactGraph(days=1, start="2026-06-01T00:00:00", progress=False)
+
+    data = payload_of(cg.GenerateVisualizer(3600, out=tmp_path / "v.html").read_text())
+    sun = {b["name"]: b for b in data["bodies"]}["SUN"]
+
+    assert sun["orbit"] == [], "the Sun does not orbit itself"
+    assert sun["central"] is None
+
+
+@pytest.mark.network
+def test_an_orbit_longer_than_the_plan_is_still_drawn_whole(mars_kernels, tmp_path):
+    # One revolution takes about 291 days, far past the one-day plan; the
+    # scratch ephemeris has to stretch to cover it
+    cg = ContactGraph(kernel_dir=mars_kernels)
+    cg.AddCelestial("Mars")
+    cg.AddSatellite("HELIO", "Sun", semi_major_axis_km=128_654_169.0,
+                    inclination_deg=23.44)
+    cg.GenerateContactGraph(days=1, start="2026-06-01T00:00:00", progress=False)
+
+    data = payload_of(cg.GenerateVisualizer(3600, out=tmp_path / "v.html").read_text())
+    helio = {b["name"]: b for b in data["bodies"]}["HELIO"]
+
+    assert len(helio["orbit"]) > 2
+    # A closed revolution comes back to where it started
+    first, last = np.array(helio["orbit"][0]), np.array(helio["orbit"][-1])
+    assert np.linalg.norm(first - last) < 0.02 * np.linalg.norm(first)

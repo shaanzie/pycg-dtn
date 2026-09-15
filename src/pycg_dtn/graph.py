@@ -382,7 +382,12 @@ class ContactGraph:
         ephemerides = SatelliteEphemerides(self._satellites)
         try:
             if self._satellites:
-                ephemerides.Build(plan.start_et, plan.stop_et)
+                # The page draws one full revolution per satellite, which for a
+                # period longer than the plan runs off the end of it
+                longest = max(s.elements.PeriodSeconds() for s in self._satellites)
+                ephemerides.Build(
+                    plan.start_et, max(plan.stop_et, plan.start_et + longest)
+                )
             payload = visualize.build_payload(
                 self,
                 plan,
