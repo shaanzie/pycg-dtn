@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 
 import spiceypy as sp
 
+from .orbital_id import REGIME_BODY, BuildEid
+
 SUN_ID = 10
 
 # Names of the nine planetary systems
@@ -37,7 +39,8 @@ class Celestial:
 
     ``name`` is the SPICE name upper-cased (``"MARS"``, ``"PHOBOS"``),
     ``naif_id`` its NAIF integer ID code, and ``eid`` the ION endpoint
-    identifier used in the contact plan, defaulting to ``dtn:<lowercase name>``.
+    identifier used in the contact plan, defaulting to an orbital IP built
+    from its clock domain (see :mod:`pycg_dtn.orbital_id`).
     """
 
     name: str
@@ -46,7 +49,9 @@ class Celestial:
 
     def __post_init__(self) -> None:
         if not self.eid:
-            object.__setattr__(self, "eid", f"dtn:{self.name.lower()}")
+            object.__setattr__(
+                self, "eid", BuildEid(self.domain, REGIME_BODY, self.name)
+            )
 
     @property
     def system(self) -> int:

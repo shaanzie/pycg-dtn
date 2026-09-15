@@ -63,7 +63,11 @@ def test_add_satellite_becomes_a_node():
     cg.AddCelestial("Mars")
     sat = cg.AddSatellite("SURVEYOR", "Mars", semi_major_axis_km=3800.0)
     assert sat.name == "SURVEYOR"
-    assert sat.eid == "dtn:surveyor"
+    assert sat.eid == (
+        "oip://bp7::v1::mars::sat::surveyor::"
+        "2026-01-01T00:00:00::3800.000::0.000000::0.000000::0.000000::"
+        "0.000000::0.000000"
+    )
     assert [n.name for n in cg.GetNodes()] == ["MARS", "SURVEYOR"]
     assert len(cg.GetLinks()) == 1
 

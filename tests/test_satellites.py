@@ -88,7 +88,13 @@ def test_satellite_defaults_its_eid_from_the_name():
         central=resolve("Mars"),
         elements=elements(),
     )
-    assert sat.eid == "dtn:mars-relay-1"
+    assert sat.eid == (
+        "oip://bp7::v1::mars::sat::mars-relay-1::"
+        "2026-01-01T00:00:00::3800.000::0.000000::0.000000::0.000000::"
+        "0.000000::0.000000"
+    )
+    # the display name is untouched by the orbital-IP default
+    assert sat.name == "MARS RELAY 1"
 
 
 def test_satellite_eid_can_be_overridden():

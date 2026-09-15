@@ -14,6 +14,7 @@ installation
 
 celestials
 satellites
+orbitalid
 contactgraph
 contactplan
 ```

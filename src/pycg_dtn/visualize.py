@@ -194,23 +194,6 @@ def build_payload(
             }
         )
 
-    if not any(b["name"] == "SUN" for b in bodies):
-        bodies.insert(
-            0,
-            {
-                "name": "SUN",
-                "eid": "",
-                "kind": "star",
-                "node": False,
-                "central": None,
-                "domain": "sun",
-                "color": BODY_COLORS["SUN"],
-                "radius_km": round(body_radius_km_of("SUN"), 3),
-                "orbit": [],
-                "pos": [[0.0, 0.0, 0.0]] * len(times),
-            },
-        )
-
     links = [(a.name, b.name) for a, b in graph.GetLinks()]
 
     return {
@@ -230,13 +213,6 @@ def build_payload(
         "active": _contacts_per_step(plan, links, times),
         "trace": trace.AsDict() if trace is not None else None,
     }
-
-
-def body_radius_km_of(name: str) -> float:
-    try:
-        return float(max(sp.bodvrd(name, "RADII", 3)[1]))
-    except Exception:
-        return 0.0
 
 
 def render(payload: dict) -> str:

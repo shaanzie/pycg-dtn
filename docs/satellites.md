@@ -30,10 +30,23 @@ Everything else is optional and defaults to a circular equatorial orbit:
 | `arg_periapsis_deg` | 0.0 |
 | `mean_anomaly_deg` | 0.0 |
 | `epoch_utc` | the graph's start epoch |
-| `eid` | `dtn:` plus the slugified name |
+| `eid` | an orbital IP, see below |
 
 Angles are degrees, distances kilometres. `epoch_utc` is the epoch that
 `mean_anomaly_deg` refers to.
+
+A satellite's default `eid` extends the same orbital-IP scheme used for
+celestials (see {doc}`celestials`), with `sat` in place of `body` and its
+Keplerian elements appended as a trailing state suffix:
+
+```python
+sat.eid
+# "oip://bp7::v1::mars::sat::relay::2026-01-01T00:00:00::3778.19::0.001..."
+```
+
+The name never changes — `sat.name` still reads `"RELAY"`, and that is what
+shows up in the visualizer's focus list and click-to-select. `eid` is a
+routing address, not a display label.
 
 ## A satellite is a node
 

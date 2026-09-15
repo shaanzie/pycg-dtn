@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 import spiceypy as sp
 
 from .celestials import Celestial, UnknownCelestialBodyError, resolve
+from .orbital_id import REGIME_SATELLITE, BuildEid
 
 _SYNTHETIC_ID_BASE = -900000
 
@@ -130,8 +131,16 @@ class Satellite:
 
     def __post_init__(self) -> None:
         if not self.eid:
-            slug = self.name.lower().replace(" ", "-").replace("_", "-")
-            object.__setattr__(self, "eid", f"dtn:{slug}")
+            object.__setattr__(
+                self,
+                "eid",
+                BuildEid(
+                    self.central.domain,
+                    REGIME_SATELLITE,
+                    self.name,
+                    elements=self.elements.AsDict(),
+                ),
+            )
 
     is_artificial = True
     is_planet = False

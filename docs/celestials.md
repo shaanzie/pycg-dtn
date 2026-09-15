@@ -40,12 +40,21 @@ Every body SPICE knows has an integer code, and the numbering is systematic:
 ## Endpoint identifiers
 
 Every node carries an ION endpoint identifier, written into the contact plan.
-The default is `dtn:` plus the lower-cased name:
+The default is an orbital IP -- a scoped address built from the body's clock
+domain, not just its name:
 
 ```python
-resolve("Mars").eid                    # "dtn:mars"
+resolve("Mars").eid                    # "oip://bp7::v1::mars::body::mars"
 resolve("Europa", eid="ipn:5.2").eid   # "ipn:5.2"
 ```
+
+`oip` (orbital IP) is a scheme name, a peer to BPv7's own `dtn`/`ipn`
+schemes. The two fields right after it are versions -- `bp7` is the Bundle
+Protocol version the endpoint is reachable over, `v1` is the version of this
+addressing scheme -- so either can change later without breaking existing
+addresses. `mars::body::mars` is `<domain>::<regime>::<node-id>`: everything
+in Mars's clock domain shares the `mars` prefix, and `body` distinguishes a
+natural body from a satellite (`sat`, see {doc}`satellites`).
 
 Pass `eid=` to `AddCelestial` to override it, which is what you want when the
 plan has to line up with an existing ION configuration.
