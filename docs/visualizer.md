@@ -21,7 +21,25 @@ generate one on the spot.
 | `days`, `start` | only used when there is no plan yet |
 
 - focus the **Sun** and the view frames every planetary orbit
-- focus a **planet** and it reframes to whatever orbits that planet
+- focus a **planet** and it zooms in and centres on that planet
+
+## Moving around
+
+The Sun stays the origin whatever is focused, so distances on screen always
+mean the same thing; focusing a body moves the camera, not the world.
+
+| Gesture | Does |
+|---|---|
+| drag | pan |
+| scroll | zoom about the cursor |
+| shift+drag, or right-drag | rotate |
+| **Reset view** | back to the starting view |
+
+## Light mode
+
+The **Light** button at the bottom right switches to a white background, for
+printing or for figures. Opening the file with `#light` on the end of the URL
+starts in light mode, and printing always uses white whichever is set.
 
 ## Satellites
 

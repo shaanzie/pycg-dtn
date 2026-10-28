@@ -11,6 +11,22 @@ TEMPLATE = r"""<!doctype html>
   :root {
     --bg: #0a0e17; --panel: #121826; --line: #1f2937; --ink: #e5e7eb;
     --muted: #8b93a1; --accent: #22d3ee; --warn: #f472b6;
+    --hover: #1b2436;
+  }
+  body.light {
+    --bg: #ffffff; --panel: #f6f7f8; --line: #d7dbe0; --ink: #1d2328;
+    --muted: #5c6670; --accent: #0e7490; --warn: #be185d;
+    --hover: #eceef1;
+  }
+  /* printing is always on white, whatever the screen is set to */
+  @media print {
+    :root {
+      --bg: #ffffff; --panel: #ffffff; --line: #c9ced4; --ink: #000000;
+      --muted: #44505c; --accent: #0e7490; --warn: #be185d;
+      --hover: #ffffff;
+    }
+    header .tabs, .themectl, .controls, .hint, .linkctl { display: none; }
+    body, html { height: auto; overflow: visible; }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
@@ -30,7 +46,7 @@ TEMPLATE = r"""<!doctype html>
     border: 1px solid transparent; background: none; font: inherit;
   }
   .tab:hover { color: var(--ink); }
-  .tab.on { background: #1b2436; color: var(--ink); border-color: var(--line); }
+  .tab.on { background: var(--hover); color: var(--ink); border-color: var(--line); }
   .spacer { flex: 1; }
   .clock { font-variant-numeric: tabular-nums; color: var(--muted); }
   .clock b { color: var(--ink); font-weight: 600; }
@@ -57,8 +73,8 @@ TEMPLATE = r"""<!doctype html>
     display: flex; align-items: center; gap: 8px; padding: 4px 7px;
     cursor: pointer; border: 1px solid transparent;
   }
-  .item:hover { background: #1b2436; }
-  .item.on { background: #1b2436; border-color: var(--line); }
+  .item:hover { background: var(--hover); }
+  .item.on { background: var(--hover); border-color: var(--line); }
   .dot { width: 8px; height: 8px; flex: none; }
   .item .nm { flex: 1; overflow: hidden; text-overflow: ellipsis;
               white-space: nowrap; }
@@ -77,11 +93,12 @@ TEMPLATE = r"""<!doctype html>
   .controls {
     position: absolute; right: 12px; top: 10px; display: flex; gap: 6px;
   }
+  .themectl { position: absolute; right: 12px; bottom: 10px; }
   button.ctl {
     background: none; color: var(--ink); border: 1px solid var(--line);
     padding: 3px 10px; cursor: pointer; font: inherit;
   }
-  button.ctl:hover { background: #1b2436; }
+  button.ctl:hover { background: var(--hover); }
 
   .tl { flex: 1; overflow: auto; padding: 16px 20px; min-width: 0; }
   .tl h3 { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
@@ -147,9 +164,10 @@ TEMPLATE = r"""<!doctype html>
         <button class="ctl" id="fwd">&rarr;</button>
         <button class="ctl" id="reset">Reset view</button>
       </div>
+      <button type="button" id="lightToggle" class="ctl themectl">Light</button>
       <div class="hint">
         <kbd>&rarr;</kbd> advance <kbd>&larr;</kbd> back
-        <kbd>Home</kbd> start &nbsp;·&nbsp; drag to rotate, scroll to zoom
+        <kbd>Home</kbd> start &nbsp;·&nbsp; drag to pan, scroll to zoom, shift+drag to rotate
         &nbsp;·&nbsp; click a satellite for its orbit
       </div>
     </div>
@@ -170,6 +188,22 @@ const DATA = "__PAYLOAD__";
 let step = 0;
 let focusName = "SUN";
 let az = 0.6, el = 0.45, zoom = 1;
+// The Sun stays the world origin whatever is selected; the camera moves
+// instead, so distances on screen always mean the same thing.
+const REFERENCE = "SUN";
+let panX = 0, panY = 0;
+// Framing a planet from a heliocentric origin needs a lot of zoom: Mars sits
+// about 58,000x in from the whole-system view.
+const MIN_ZOOM = 0.02, MAX_ZOOM = 1e7;
+let light = false;
+const INK = {
+  dark:  { label: "#9aa3b2", halo: "#ffffff", link: "#34d399", orbit: 0.30 },
+  light: { label: "#44505c", halo: "#1d2328", link: "#0f9d6b", orbit: 0.55 },
+};
+function ink() { return light ? INK.light : INK.dark; }
+function originPoint() {
+  return byName[REFERENCE] ? world(byName[REFERENCE], step) : [0, 0, 0];
+}
 let selected = null;
 const selectedLinks = new Set();
 const byName = {};
@@ -234,7 +268,31 @@ function resize() {
 }
 function project(p, origin) {
   const q = rot([p[0] - origin[0], p[1] - origin[1], p[2] - origin[2]]);
-  return [W / 2 + q[0] * scale, H / 2 - q[1] * scale, q[2]];
+  return [W / 2 + panX + q[0] * scale, H / 2 + panY - q[1] * scale, q[2]];
+}
+
+function updateScale() {
+  scale = (Math.min(W, H) * 0.42) / (baseSpan(REFERENCE) / zoom);
+}
+
+/** Frames ``name``: zooms to its neighbourhood and pans it to the centre. */
+function frame(name) {
+  const span = baseSpan(name);
+  if (span > 0) {
+    zoom = Math.max(MIN_ZOOM, Math.min(baseSpan(REFERENCE) / span, MAX_ZOOM));
+  }
+  updateScale();
+  centreOn(name);
+}
+
+/** Pans so that ``name`` sits at the centre of the canvas. */
+function centreOn(name) {
+  const b = byName[name];
+  if (!b) { panX = 0; panY = 0; return; }
+  panX = 0; panY = 0;
+  const p = project(world(b, step), originPoint());
+  panX = W / 2 - p[0];
+  panY = H / 2 - p[1];
 }
 
 function drawOrbit(b, origin, sel) {
@@ -248,7 +306,7 @@ function drawOrbit(b, origin, sel) {
   }
   ctx.closePath();
   ctx.strokeStyle = sel ? DATA.meta.satellite_highlight : b.color;
-  ctx.globalAlpha = sel ? 0.95 : 0.3;
+  ctx.globalAlpha = sel ? 0.95 : ink().orbit;
   ctx.lineWidth = sel ? 1.6 : 1;
   ctx.stroke();
   ctx.globalAlpha = 1;
@@ -265,9 +323,9 @@ function drawBody(d) {
   ctx.fillStyle = on ? DATA.meta.satellite_highlight : d.b.color;
   ctx.fill();
   if (on) {
-    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.strokeStyle = ink().halo; ctx.lineWidth = 1.5; ctx.stroke();
   }
-  ctx.fillStyle = on ? "#ffffff" : "#9aa3b2";
+  ctx.fillStyle = on ? ink().halo : ink().label;
   ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
   ctx.fillText(d.b.name, d.x + r + 4, d.y + 3);
 }
@@ -275,8 +333,8 @@ function drawBody(d) {
 function draw() {
   if (!W) return;
   ctx.clearRect(0, 0, W, H);
-  const origin = byName[focusName] ? world(byName[focusName], step) : [0, 0, 0];
-  scale = (Math.min(W, H) * 0.42) / (baseSpan(focusName) / zoom);
+  const origin = originPoint();
+  updateScale();
 
   DATA.bodies.forEach(b => {
     if (!b.orbit.length) return;
@@ -295,7 +353,7 @@ function draw() {
     ctx.beginPath();
     ctx.moveTo(pa[0], pa[1]);
     ctx.lineTo(pb[0], pb[1]);
-    ctx.strokeStyle = "#34d399";
+    ctx.strokeStyle = ink().link;
     ctx.globalAlpha = 0.55;
     ctx.lineWidth = 1.2;
     ctx.stroke();
@@ -366,7 +424,7 @@ function renderFocus() {
         selected = selected === name ? null : name;
       }
       focusName = name;
-      zoom = 1;
+      frame(name);
       renderFocus();
       draw();
     };
@@ -375,22 +433,30 @@ function renderFocus() {
 
 let drag = null, moved = 0;
 cv.addEventListener("mousedown", e => {
-  drag = { x: e.clientX, y: e.clientY }; moved = 0;
+  drag = { x: e.clientX, y: e.clientY, rotate: e.shiftKey || e.button === 2 };
+  moved = 0;
 });
+cv.addEventListener("contextmenu", e => e.preventDefault());
 window.addEventListener("mouseup", () => { drag = null; });
 window.addEventListener("mousemove", e => {
   if (!drag) return;
-  moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y);
-  az += (e.clientX - drag.x) * 0.01;
-  el = Math.max(-1.5, Math.min(1.5, el + (e.clientY - drag.y) * 0.01));
-  drag = { x: e.clientX, y: e.clientY };
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  moved += Math.abs(dx) + Math.abs(dy);
+  if (drag.rotate) {
+    az += dx * 0.01;
+    el = Math.max(-1.5, Math.min(1.5, el + dy * 0.01));
+  } else {
+    panX += dx;
+    panY += dy;
+  }
+  drag = { x: e.clientX, y: e.clientY, rotate: drag.rotate };
   draw();
 });
 cv.addEventListener("click", e => {
   if (moved > 4) return;              
   const r = cv.getBoundingClientRect();
   const mx = e.clientX - r.left, my = e.clientY - r.top;
-  const origin = byName[focusName] ? world(byName[focusName], step) : [0, 0, 0];
+  const origin = originPoint();
   let best = null, bd = 14;
   DATA.bodies.forEach(b => {
     if (b.kind !== "satellite") return;
@@ -404,8 +470,16 @@ cv.addEventListener("click", e => {
 });
 cv.addEventListener("wheel", e => {
   e.preventDefault();
-  zoom *= e.deltaY < 0 ? 1.15 : 1 / 1.15;
-  zoom = Math.max(0.02, Math.min(zoom, 5000));
+  const r = cv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const next = Math.max(MIN_ZOOM,
+                        Math.min(zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), MAX_ZOOM));
+  // hold the point under the cursor still while the scale changes
+  const f = next / zoom;
+  const cx = W / 2 + panX, cy = H / 2 + panY;
+  panX = (mx + f * (cx - mx)) - W / 2;
+  panY = (my + f * (cy - my)) - H / 2;
+  zoom = next;
   draw();
 }, { passive: false });
 
@@ -416,7 +490,7 @@ function go(n) {
 document.getElementById("fwd").onclick = () => go(step + 1);
 document.getElementById("back").onclick = () => go(step - 1);
 document.getElementById("reset").onclick = () => {
-  az = 0.6; el = 0.45; zoom = 1; draw();
+  az = 0.6; el = 0.45; zoom = 1; panX = 0; panY = 0; draw();
 };
 document.getElementById("linksAll").onclick = () => {
   DATA.links.forEach((_, i) => selectedLinks.add(i));
@@ -433,9 +507,9 @@ window.addEventListener("keydown", e => {
   else if (e.key === "End") { go(DATA.meta.n_steps - 1); e.preventDefault(); }
 });
 
-document.querySelectorAll(".tab").forEach(t => {
+document.querySelectorAll(".tabs .tab").forEach(t => {
   t.onclick = () => {
-    document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
+    document.querySelectorAll(".tabs .tab").forEach(x => x.classList.remove("on"));
     document.querySelectorAll(".view").forEach(x => x.classList.remove("on"));
     t.classList.add("on");
     document.getElementById("view-" + t.dataset.view).classList.add("on");
@@ -553,6 +627,16 @@ function renderTimeline(b) {
 
   host.innerHTML = head + lanes + axis + key + table;
 }
+
+function setLight(on) {
+  light = on;
+  document.body.classList.toggle("light", light);
+  document.getElementById("lightToggle").textContent = light ? "Dark" : "Light";
+  draw();
+}
+document.getElementById("lightToggle").onclick = () => setLight(!light);
+// #light in the URL opens straight into the printable theme
+if (location.hash.indexOf("light") >= 0) { setLight(true); }
 
 document.getElementById("stepmax").textContent = DATA.meta.n_steps - 1;
 renderFocus();
