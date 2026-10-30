@@ -12,6 +12,7 @@ import numpy as np
 import spiceypy as sp
 
 from .satellites import Satellite, SatelliteError
+from .stations import GroundStation
 
 COVERAGE_PAD_S = 86400.0
 STATES_PER_ORBIT = 8
@@ -65,11 +66,54 @@ def write_spk(sat: Satellite, t0: float, t1: float, path: str | Path) -> Path:
     return path
 
 
-class SatelliteEphemerides:
-    """Scratch SPKs for a set of satellites"""
+def write_station_spk(
+    station: GroundStation, t0: float, t1: float, path: str | Path
+) -> Path:
+    """Write a fixed site as a constant state in its body-fixed frame (type 9)."""
+    if t1 <= t0:
+        raise SatelliteError(f"empty span for {station.name}: {t0} -> {t1}")
 
-    def __init__(self, satellites: list[Satellite]) -> None:
+    position = station.BodyFixedPosition()
+    state = [position[0], position[1], position[2], 0.0, 0.0, 0.0]
+    lo, hi = t0 - COVERAGE_PAD_S, t1 + COVERAGE_PAD_S
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        path.unlink()
+
+    handle = sp.spkopn(str(path), f"pycg-dtn {station.name}", 0)
+    try:
+        # Two identical states with linear interpolation: a constant position
+        sp.spkw09(
+            handle,
+            station.naif_id,
+            station.central.naif_id,
+            station.BodyFrame(),
+            lo,
+            hi,
+            f"{station.name} fixed site",
+            1,
+            2,
+            [state, state],
+            [lo, hi],
+        )
+    finally:
+        sp.spkcls(handle)
+
+    return path
+
+
+class SatelliteEphemerides:
+    """Scratch SPKs for a set of satellites and ground stations"""
+
+    def __init__(
+        self,
+        satellites: list[Satellite],
+        stations: list[GroundStation] | None = None,
+    ) -> None:
         self._satellites = list(satellites)
+        self._stations = list(stations or [])
         self._dir: Path | None = None
         self._paths: dict[str, Path] = {}
 
@@ -82,6 +126,12 @@ class SatelliteEphemerides:
             sp.furnsh(str(path))
             sp.boddef(sat.name, sat.naif_id)
             self._paths[sat.name] = path
+        for station in self._stations:
+            slug = station.name.lower().replace(" ", "_").replace("-", "_")
+            path = write_station_spk(station, t0, t1, self._dir / f"{slug}.bsp")
+            sp.furnsh(str(path))
+            sp.boddef(station.name, station.naif_id)
+            self._paths[station.name] = path
         return dict(self._paths)
 
     def Cleanup(self) -> None:

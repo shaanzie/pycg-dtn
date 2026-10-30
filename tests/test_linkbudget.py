@@ -108,3 +108,35 @@ def test_as_dict_round_trips_into_a_new_budget():
     lb = LinkBudget().SetTxPower(123.0).SetFrequency(2.3e9)
     clone = LinkBudget(**lb.AsDict())
     assert clone.AsDict() == lb.AsDict()
+
+
+def test_no_rate_cap_by_default():
+    lb = LinkBudget()
+    assert lb.GetMaxRate() is None
+    assert lb.AsDict()["max_rate_bps"] is None
+
+
+def test_max_rate_caps_short_links_only():
+    lb = LinkBudget(max_rate_bps=5.0e6)
+    assert float(lb.RateBps(1000.0)) == 5.0e6
+    assert float(lb.RateBps(AU_KM)) < 5.0e6
+
+
+def test_max_rate_can_be_removed():
+    lb = LinkBudget().SetMaxRate(1.0e6).SetMaxRate(None)
+    assert lb.GetMaxRate() is None
+    with pytest.raises(ValueError):
+        lb.SetMaxRate(0.0)
+
+
+def test_noise_temperature_matches_kt():
+    # 290 K is the -174 dBm/Hz reference
+    lb = LinkBudget().SetNoiseTemperature(290.0)
+    assert lb.GetNoisePsd() == pytest.approx(-173.98, abs=0.01)
+    assert lb.GetNoiseTemperature() == pytest.approx(290.0)
+
+
+def test_colder_receiver_gives_more_rate():
+    warm = LinkBudget().SetNoiseTemperature(290.0)
+    cold = LinkBudget().SetNoiseTemperature(25.0)
+    assert float(cold.RateBps(AU_KM)) > float(warm.RateBps(AU_KM))

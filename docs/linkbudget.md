@@ -31,7 +31,13 @@ pointing loss is modelled.
 | Transmit gain, dBi | `GetTxGain` / `SetTxGain` | 48 |
 | Receive gain, dBi | `GetRxGain` / `SetRxGain` | 74.18 |
 | Noise PSD, dBm/Hz | `GetNoisePsd` / `SetNoisePsd` | −174 |
+| Noise temperature, K | `GetNoiseTemperature` / `SetNoiseTemperature` | 290 (same as the PSD) |
 | Rate floor, bits/s | `GetMinRate` / `SetMinRate` | 1 |
+| Rate cap, bits/s | `GetMaxRate` / `SetMaxRate` | none |
+
+`SetNoiseTemperature(T)` sets the noise PSD to kT, so a receiver can be
+described by its published system noise temperature. `max_rate_bps` caps the
+Shannon rate at what the radio actually supports, e.g. its highest symbol rate.
 
 The defaults model a spacecraft high-gain dish of roughly 3 m talking to a DSN
 70 m ground antenna (74.18 dBi at X-band, [Rodemich
@@ -58,6 +64,41 @@ lb.AsDict()           # every parameter, embedded in output metadata
 | Jupiter, 5.2 AU | 0.6 Mbps |
 
 Rate falls with the square of distance, which is why contacts get subdivided.
+
+## Per-link radios
+
+Real networks use different radios on different links: S-band between a lander
+and a relay, Ka-band between the relay and Earth. Put nodes in **groups** and
+give each pair of groups its own budget:
+
+```python
+cg.AddGroundStation("GOLDSTONE", "Earth", latitude_deg=35.43,
+                    longitude_deg=-116.89, group="dsn")
+cg.AddSatellite("RELAY", "Moon", semi_major_axis_km=11300.0, group="relay")
+
+cg.SetLinkBudgetFor("dsn", "relay", uplink)     # dsn -> relay
+cg.SetLinkBudgetFor("relay", "dsn", downlink)   # relay -> dsn
+```
+
+A budget applies to one direction. For a direction with no budget of its own,
+the reverse direction's budget is used, then the default from
+`GetLinkBudget()`. A node with no group is its own group, named after the node.
+`SetNodeGroup(name, group)` changes it later.
+
+Each direction gets its own rate, so a contact carries `rate_bps` (a to b) and
+`rate_ba_bps` (b to a), and the ION plan lists each direction with its own
+rate. A piece of a contact is kept only if both directions clear their rate
+floor.
+
+Link types that should never exist can be switched off:
+
+```python
+cg.DisableLinks("relay", "relay")   # no crosslinks
+cg.GetDisabledLinks()               # [("relay", "relay")]
+cg.EnableLinks("relay", "relay")
+```
+
+Every budget is recorded in the plan metadata under `link_budgets`.
 
 ## The rate floor
 

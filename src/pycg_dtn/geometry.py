@@ -66,6 +66,7 @@ class GeometryConfig:
         "_sep_exclusion_deg",
         "_rate_sample_s",
         "_rate_tolerance",
+        "_elevation_step_s",
     )
 
     def __init__(
@@ -78,7 +79,9 @@ class GeometryConfig:
         sep_exclusion_deg: float = 3.0,
         rate_sample_s: float = 3600.0,
         rate_tolerance: float = 0.10,
+        elevation_step_s: float = 60.0,
     ) -> None:
+        self._elevation_step_s = _positive("elevation_step_s", elevation_step_s)
         self._occult_step_s = _positive("occult_step_s", occult_step_s)
         self._corona_step_s = _positive("corona_step_s", corona_step_s)
         self._prefilter_step_s = _positive("prefilter_step_s", prefilter_step_s)
@@ -142,6 +145,17 @@ class GeometryConfig:
         """The exclusion angle expressed as a miss distance from the Sun, km."""
         return AU_KM * math.sin(math.radians(self._sep_exclusion_deg))
 
+    def GetElevationStep(self) -> float:
+        """Ground-station elevation search step, seconds."""
+        return self._elevation_step_s
+
+    def SetElevationStep(self, seconds: float) -> GeometryConfig:
+        """Set the elevation search step. It must be shorter than the shortest
+        pass a station should catch.
+        """
+        self._elevation_step_s = _positive("elevation_step_s", seconds)
+        return self
+
     def GetRateSample(self) -> float:
         """Spacing at which range and rate are sampled inside a contact, seconds."""
         return self._rate_sample_s
@@ -173,6 +187,7 @@ class GeometryConfig:
             "corona_exclusion_km": self.GetCoronaExclusionKm(),
             "rate_sample_s": self._rate_sample_s,
             "rate_tolerance": self._rate_tolerance,
+            "elevation_step_s": self._elevation_step_s,
         }
 
 
@@ -261,6 +276,41 @@ def corona_window(a: Celestial, b: Celestial, cnfine, config: GeometryConfig):
         2000,
         cnfine,
         sp.cell_double(4000),
+    )
+    del udf, udq
+    return result
+
+
+def elevation_deg(station, target_name: str, et: float) -> float:
+    """Elevation of ``target_name`` above ``station``'s local horizon, degrees."""
+    rotate = np.asarray(sp.pxform(station.BodyFrame(), "J2000", et), dtype=float)
+    up = rotate.dot(station.LocalUp())
+    los = np.asarray(sp.spkpos(target_name, et, "J2000", "NONE", station.name)[0])
+    sin_el = up.dot(los) / np.linalg.norm(los)
+    return math.degrees(math.asin(float(np.clip(sin_el, -1.0, 1.0))))
+
+
+def elevation_window(station, target: Celestial, cnfine, config: GeometryConfig):
+    """Times within ``cnfine`` when ``target`` is above ``station``'s mask."""
+
+    def elevation(et: float) -> float:
+        return elevation_deg(station, target.name, et)
+
+    def is_decreasing(f, et):
+        return sp.uddc(f, et, 10.0)
+
+    udf = SpiceUDFUNS(elevation)
+    udq = SpiceUDFUNB(is_decreasing)
+    result = sp.gfuds(
+        udf,
+        udq,
+        ">",
+        station.min_elevation_deg,
+        0.0,
+        config.GetElevationStep(),
+        20000,
+        cnfine,
+        sp.cell_double(40000),
     )
     del udf, udq
     return result

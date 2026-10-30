@@ -22,7 +22,9 @@ roughly constant rate.
 | `a_eid`, `b_eid` | ION endpoint identifiers |
 | `kind` | `"intra"` or `"inter"` clock domain |
 | `start_et`, `stop_et` | span, in SPICE ephemeris seconds |
-| `rate_bps` | representative rate across this contact |
+| `rate_bps` | representative rate a to b across this contact |
+| `rate_ba_bps` | rate b to a; `None` means the same as `rate_bps` |
+| `reverse_rate_bps` | derived: the b to a rate |
 | `owlt_s` | one-way light time, mean |
 | `owlt_min_s`, `owlt_max_s` | one-way light time, range |
 | `range_min_km`, `range_max_km` | distance range |

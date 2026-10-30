@@ -72,7 +72,9 @@ SYSTEM_SPK: dict[int, Kernel] = {
 
 
 def required_for(
-    celestials: list[Celestial], satellites: list | None = None
+    celestials: list[Celestial],
+    satellites: list | None = None,
+    stations: list | None = None,
 ) -> list[Kernel]:
     """The kernels needed to place every one of ``celestials`` in space."""
     kernels = [LSK, PCK, PLANETS]
@@ -80,8 +82,8 @@ def required_for(
     if satellites:
         kernels.append(GM)
 
-    # A satellite's central body has to be locatable even if it is not a node
     bodies = list(celestials) + [s.central for s in satellites or []]
+    bodies = bodies + [s.central for s in stations or []]
 
     needs_satellites: set[int] = set()
     for body in bodies:

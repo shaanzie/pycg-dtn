@@ -28,17 +28,34 @@ All three are optional.
 
 ## Adding nodes
 
-{doc}`celestials` covers natural bodies, {doc}`satellites` covers spacecraft.
-Both become nodes of the same kind, and every unordered pair of nodes becomes a
-link:
+{doc}`celestials` covers natural bodies, {doc}`satellites` covers spacecraft,
+{doc}`stations` covers fixed sites on a surface. All become nodes, and every
+unordered pair of nodes becomes a link, except pairs switched off with
+`DisableLinks` and stations on the same body:
 
 ```python
 cg.GetCelestials()   # natural bodies, in the order added
 cg.GetSatellites()   # artificial satellites
-cg.GetNodes()        # both
-cg.GetLinks()        # every unordered pair
+cg.GetStations()     # ground stations
+cg.GetNodes()        # all of them
+cg.GetLinks()        # every linkable unordered pair
 cg.LinkKind(a, b)    # "intra" if the two share a clock domain, else "inter"
 ```
+
+Every `Add*` takes an optional `group=`, used for per-link radios and disabled
+links (see {doc}`linkbudget`).
+
+A satellite can also be added from a Cartesian state instead of elements, e.g.
+a published reference state:
+
+```python
+cg.AddSatelliteFromState("SV-1", "Moon",
+                         [x, y, z, vx, vy, vz],   # km, km/s
+                         "2027-03-01T00:00:00",
+                         frame="J2000")
+```
+
+The state is converted to osculating two-body elements about the central body.
 
 ## Configuring
 

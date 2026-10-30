@@ -167,8 +167,8 @@ TEMPLATE = r"""<!doctype html>
       <button type="button" id="lightToggle" class="ctl themectl">Light</button>
       <div class="hint">
         <kbd>&rarr;</kbd> advance <kbd>&larr;</kbd> back
-        <kbd>Home</kbd> start &nbsp;·&nbsp; drag to pan, scroll to zoom, shift+drag to rotate
-        &nbsp;·&nbsp; click a satellite for its orbit
+        <kbd>Home</kbd> start &nbsp;·&nbsp; drag to pan, scroll to zoom,
+        shift+drag to rotate &nbsp;·&nbsp; click a satellite for its orbit
       </div>
     </div>
   </section>

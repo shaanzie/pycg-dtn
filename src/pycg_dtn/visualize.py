@@ -92,6 +92,8 @@ def _positions(name: str, ets: np.ndarray, observer: str) -> np.ndarray:
 
 def orbit_path(node, et: float) -> list[list[float]]:
     """One full revolution, relative to whatever the node orbits."""
+    if getattr(node, "is_station", False):
+        return []  # a ground station turns with its body, it has no orbit
     observer = parent_body(node)
     if node.name == observer:
         return []  # the Sun does not orbit itself
@@ -184,6 +186,7 @@ def build_payload(
                 "name": node.name,
                 "eid": getattr(node, "eid", ""),
                 "kind": "satellite" if artificial else "celestial",
+                "station": getattr(node, "is_station", False),
                 "node": node.name in node_names,
                 "central": relative,
                 "domain": node.domain,

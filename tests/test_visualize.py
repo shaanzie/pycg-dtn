@@ -216,3 +216,21 @@ def test_an_orbit_longer_than_the_plan_is_still_drawn_whole(mars_kernels, tmp_pa
     # A closed revolution comes back to where it started
     first, last = np.array(helio["orbit"][0]), np.array(helio["orbit"][-1])
     assert np.linalg.norm(first - last) < 0.02 * np.linalg.norm(first)
+
+
+@pytest.mark.network
+def test_a_ground_station_is_drawn_on_its_body_without_an_orbit(mars_kernels, tmp_path):
+    cg = ContactGraph(kernel_dir=mars_kernels)
+    cg.AddCelestial("Moon")
+    cg.AddGroundStation("GDS", "Earth", latitude_deg=35.4, longitude_deg=-116.9)
+    cg.GenerateContactGraph(days=1, start="2026-06-01T00:00:00", progress=False)
+
+    data = payload_of(cg.GenerateVisualizer(3600, out=tmp_path / "v.html").read_text())
+    gds = {b["name"]: b for b in data["bodies"]}["GDS"]
+
+    assert gds["station"] is True
+    assert gds["orbit"] == []
+    assert gds["central"] == "EARTH"
+    # It stays on the surface as Earth turns
+    radius = np.linalg.norm(np.array(gds["pos"]), axis=1)
+    assert np.allclose(radius, radius[0], rtol=1e-6)

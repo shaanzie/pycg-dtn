@@ -186,3 +186,89 @@ def test_kernel_dir_setter():
     cg = ContactGraph()
     cg.SetKernelDir("/tmp/some-kernels")
     assert str(cg.GetKernelDir()) == "/tmp/some-kernels"
+
+
+def test_node_without_a_group_is_its_own_group():
+    cg = ContactGraph()
+    cg.AddCelestial("Earth", group="ground")
+    cg.AddCelestial("Mars")
+    assert cg.GetNodeGroup("Earth") == "ground"
+    assert cg.GetNodeGroup("mars") == "MARS"
+
+
+def test_set_node_group_needs_a_known_node():
+    cg = ContactGraph()
+    cg.AddCelestial("Earth")
+    cg.SetNodeGroup("Earth", "ground")
+    assert cg.GetNodeGroup("Earth") == "ground"
+    with pytest.raises(ContactGraphError, match="no node named"):
+        cg.SetNodeGroup("Pluto", "far")
+
+
+def test_disabled_groups_are_not_linked():
+    cg = ContactGraph()
+    cg.AddCelestial("Earth", group="a")
+    cg.AddCelestial("Mars", group="b")
+    cg.AddCelestial("Jupiter", group="b")
+    cg.DisableLinks("b", "a")
+    assert [{x.name, y.name} for x, y in cg.GetLinks()] == [{"MARS", "JUPITER"}]
+    assert cg.GetDisabledLinks() == [("a", "b")]
+
+    cg.DisableLinks("b", "b")
+    assert cg.GetLinks() == []
+    cg.EnableLinks("a", "b")
+    assert len(cg.GetLinks()) == 2
+
+
+def test_budget_lookup_falls_back_to_reverse_then_default():
+    cg = ContactGraph()
+    up = LinkBudget(frequency_hz=7.2e9)
+    down = LinkBudget(frequency_hz=8.4e9)
+    cg.SetLinkBudgetFor("ground", "relay", up)
+    assert cg.GetLinkBudgetFor("ground", "relay") is up
+    assert cg.GetLinkBudgetFor("relay", "ground") is up
+    cg.SetLinkBudgetFor("relay", "ground", down)
+    assert cg.GetLinkBudgetFor("relay", "ground") is down
+    assert cg.GetLinkBudgetFor("relay", "relay") is cg.GetLinkBudget()
+    with pytest.raises(TypeError):
+        cg.SetLinkBudgetFor("a", "b", GeometryConfig())
+
+
+@pytest.mark.network
+def test_satellite_from_state_recovers_its_elements(mars_kernels):
+    import math
+
+    import spiceypy as sp
+
+    cg = ContactGraph(kernel_dir=mars_kernels)
+    ref = cg.AddSatellite(
+        "REF",
+        "Moon",
+        semi_major_axis_km=11300.0,
+        eccentricity=0.69,
+        inclination_deg=57.0,
+        raan_deg=320.0,
+        arg_periapsis_deg=92.0,
+        mean_anomaly_deg=30.0,
+        epoch_utc="2027-03-01T00:00:00",
+    )
+    et = sp.str2et("2027-03-01T00:00:00")
+    mu = ref.elements.GravitationalParameter()
+    state = sp.conics(ref.elements.AsConicArray(et, mu), et)
+
+    sat = cg.AddSatelliteFromState("COPY", "Moon", list(state), "2027-03-01T00:00:00")
+    assert sat.elements.semi_major_axis_km == pytest.approx(11300.0, rel=1e-9)
+    assert sat.elements.eccentricity == pytest.approx(0.69, abs=1e-9)
+    assert sat.elements.inclination_deg == pytest.approx(57.0, abs=1e-7)
+    assert math.cos(math.radians(sat.elements.mean_anomaly_deg)) == pytest.approx(
+        math.cos(math.radians(30.0)), abs=1e-7
+    )
+
+
+@pytest.mark.network
+def test_satellite_from_state_rejects_open_orbits(mars_kernels):
+    cg = ContactGraph(kernel_dir=mars_kernels)
+    with pytest.raises(SatelliteError, match="not a closed orbit"):
+        cg.AddSatelliteFromState(
+            "ESCAPE", "Moon", [2000.0, 0.0, 0.0, 0.0, 5.0, 0.0], "2027-03-01T00:00:00"
+        )
