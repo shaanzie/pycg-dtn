@@ -99,6 +99,23 @@ MERCURY   MRO-LIKE  inter in contact  71.5%   longest outage   4.27 d
 MARS      MRO-LIKE  intra in contact 100.0%   longest outage   0.00 d
 ```
 
+A satellite can also come from a published Cartesian state, with
+`AddSatelliteFromState(name, central, [x, y, z, vx, vy, vz], epoch_utc)`.
+
+## Ground stations
+
+A ground station is a fixed site on a body's surface. It turns with the body
+and only sees targets above its elevation mask:
+
+```python
+cg.AddGroundStation("GOLDSTONE", "Earth", latitude_deg=35.4259,
+                    longitude_deg=-116.8895, altitude_km=1.0,
+                    min_elevation_deg=10.0)
+```
+
+Two stations on the same body are never linked. Station elevations agree with
+NAIF's DSS-14 topocentric frame to within 0.07 deg.
+
 ## Kernels
 
 A *kernel* is NAIF's term for a SPICE data file. Only the ones your bodies need are
@@ -145,7 +162,27 @@ print(lb.GetWavelength(), lb.GetNoisePower())
 | Transmit gain, dBi | `GetTxGain` / `SetTxGain` | 48 |
 | Receive gain, dBi | `GetRxGain` / `SetRxGain` | 74.18 |
 | Noise PSD, dBm/Hz | `GetNoisePsd` / `SetNoisePsd` | −174 |
+| Noise temperature, K | `GetNoiseTemperature` / `SetNoiseTemperature` | 290 |
 | Rate floor, bits/s | `GetMinRate` / `SetMinRate` | 1 |
+| Rate cap, bits/s | `GetMaxRate` / `SetMaxRate` | none |
+
+### Per-link radios
+
+Put nodes in groups and give each pair of groups its own budget, one per
+direction. A direction with no budget uses the reverse direction's, then the
+default:
+
+```python
+cg.AddSatellite("RELAY", "Moon", semi_major_axis_km=11300.0, group="relay")
+cg.AddGroundStation("GOLDSTONE", "Earth", latitude_deg=35.43,
+                    longitude_deg=-116.89, group="dsn")
+cg.SetLinkBudgetFor("relay", "dsn", ka_downlink)
+cg.SetLinkBudgetFor("dsn", "relay", ka_uplink)
+cg.DisableLinks("relay", "relay")    # no crosslinks
+```
+
+Each contact then carries a rate for each direction, and the ION plan lists
+each direction with its own rate.
 
 ## Configuring the geometry search
 
@@ -199,6 +236,16 @@ pycg build --bodies Earth Mars --days 780 \
 
 Keys are `alt` or `sma` (give one), `ecc`, `inc`, `raan`, `argp`, `ma`, `eid`.
 The central body does not have to be a node — it still occults its own orbiter.
+
+Ground stations work the same way, with keys `lat`, `lon` (required), `alt`,
+`el` (elevation mask, degrees) and `eid`:
+
+```bash
+pycg build --bodies Moon --days 2 \
+           --station GOLDSTONE,Earth,lat=35.43,lon=-116.89,el=10
+```
+
+Per-link radios are only available from Python.
 
 ## Citing
 

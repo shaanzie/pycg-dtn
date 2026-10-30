@@ -12,9 +12,10 @@ from .kernels import Kernel, KernelError
 from .linkbudget import C_KM_S, LinkBudget
 from .plan import Contact, ContactPlan, LinkSummary
 from .satellites import KeplerianElements, Satellite, SatelliteError
+from .stations import GroundStation, GroundStationError
 from .visualize import VisualizerError
 
-__version__ = "1.7.0"
+__version__ = "2.0.0"
 
 __all__ = [
     "VisualizerError",
@@ -29,6 +30,8 @@ __all__ = [
     "ContactGraphError",
     "ContactPlan",
     "GeometryConfig",
+    "GroundStation",
+    "GroundStationError",
     "KeplerianElements",
     "Kernel",
     "KernelError",

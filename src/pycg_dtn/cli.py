@@ -15,6 +15,7 @@ from .graph import DEFAULT_START_UTC, ContactGraph, ContactGraphError
 from .kernels import KernelError
 from .linkbudget import LinkBudget
 from .satellites import SatelliteError
+from .stations import GroundStationError
 
 _SAT_KEYS = {
     "alt": "altitude_km",
@@ -69,6 +70,55 @@ def _parse_satellite(spec: str) -> tuple[str, str, dict]:
     return name, central, kwargs
 
 
+_STATION_KEYS = {
+    "lat": "latitude_deg",
+    "latitude_deg": "latitude_deg",
+    "lon": "longitude_deg",
+    "longitude_deg": "longitude_deg",
+    "alt": "altitude_km",
+    "altitude_km": "altitude_km",
+    "el": "min_elevation_deg",
+    "min_elevation_deg": "min_elevation_deg",
+    "eid": "eid",
+}
+
+
+def _parse_station(spec: str) -> tuple[str, str, dict]:
+    parts = [p.strip() for p in spec.split(",") if p.strip()]
+    if len(parts) < 4:
+        raise GroundStationError(
+            f"station {spec!r} must be NAME,CENTRAL,lat=...,lon=...[,alt=...,el=...] "
+            "for example: GOLDSTONE,Earth,lat=35.43,lon=-116.89,el=10"
+        )
+
+    name, central = parts[0], parts[1]
+    kwargs: dict = {}
+    for item in parts[2:]:
+        if "=" not in item:
+            raise GroundStationError(f"station {name}: expected key=value, got {item!r}")
+        key, _, value = item.partition("=")
+        key = key.strip().lower()
+        if key not in _STATION_KEYS:
+            raise GroundStationError(
+                f"station {name}: unknown option {key!r}; "
+                f"choose from {', '.join(sorted(set(_STATION_KEYS)))}"
+            )
+        canonical = _STATION_KEYS[key]
+        if canonical == "eid":
+            kwargs[canonical] = value.strip()
+        else:
+            try:
+                kwargs[canonical] = float(value)
+            except ValueError as exc:
+                raise GroundStationError(
+                    f"station {name}: {key} must be a number, got {value!r}"
+                ) from exc
+
+    if "latitude_deg" not in kwargs or "longitude_deg" not in kwargs:
+        raise GroundStationError(f"station {name}: lat and lon are required")
+    return name, central, kwargs
+
+
 def _build_graph(args: argparse.Namespace) -> ContactGraph:
     budget = LinkBudget()
     for attr, setter in (
@@ -95,9 +145,12 @@ def _build_graph(args: argparse.Namespace) -> ContactGraph:
     for spec in getattr(args, "satellite", None) or []:
         name, central, kwargs = _parse_satellite(spec)
         cg.AddSatellite(name, central, **kwargs)
+    for spec in getattr(args, "station", None) or []:
+        name, central, kwargs = _parse_station(spec)
+        cg.AddGroundStation(name, central, **kwargs)
 
     if not cg.GetNodes():
-        raise ContactGraphError("give at least one --bodies or --satellite")
+        raise ContactGraphError("give at least one --bodies, --satellite or --station")
     return cg
 
 
@@ -155,6 +208,13 @@ def _add_common(p: argparse.ArgumentParser) -> None:
         default=[],
         metavar="SPEC",
         help="artificial satellite as NAME,CENTRAL,key=value,...",
+    )
+    p.add_argument(
+        "--station",
+        action="append",
+        default=[],
+        metavar="SPEC",
+        help="ground station as NAME,CENTRAL,lat=..,lon=..[,alt=..,el=..]",
     )
     p.add_argument(
         "--kernel-dir",
@@ -226,6 +286,7 @@ def main(argv: list[str] | None = None) -> int:
         KernelError,
         ContactGraphError,
         SatelliteError,
+        GroundStationError,
     ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

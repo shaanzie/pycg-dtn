@@ -30,14 +30,23 @@ class Contact:
     owlt_max_s: float
     range_min_km: float
     range_max_km: float
+    #: b -> a rate when the link is asymmetric; None means the same as rate_bps
+    rate_ba_bps: float | None = None
 
     @property
     def duration_s(self) -> float:
         return self.stop_et - self.start_et
 
     @property
+    def reverse_rate_bps(self) -> float:
+        """The b -> a rate."""
+        if self.rate_ba_bps is None:
+            return self.rate_bps
+        return self.rate_ba_bps
+
+    @property
     def volume_bits(self) -> float:
-        """How much data this contact can carry end to end."""
+        """How much data this contact can carry a -> b."""
         return self.rate_bps * self.duration_s
 
 
@@ -105,8 +114,12 @@ class ContactPlan:
                 e = int(round(c.stop_et - self.start_et))
                 if e <= s:
                     continue
-                for src, dst in ((c.a_eid, c.b_eid), (c.b_eid, c.a_eid)):
-                    fh.write(f"a contact +{s} +{e} {src} {dst} {int(c.rate_bps)}\n")
+                directions = (
+                    (c.a_eid, c.b_eid, c.rate_bps),
+                    (c.b_eid, c.a_eid, c.reverse_rate_bps),
+                )
+                for src, dst, rate in directions:
+                    fh.write(f"a contact +{s} +{e} {src} {dst} {int(rate)}\n")
                     fh.write(f"a range +{s} +{e} {src} {dst} {c.owlt_s:.6f}\n")
         return path
 

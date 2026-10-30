@@ -8,6 +8,9 @@ import numpy as np
 #: Speed of light in vacuum, km/s]
 C_KM_S = 299792.458
 
+#: Boltzmann constant, J/K (exact, 2019 SI): https://physics.nist.gov/cgi-bin/cuu/Value?k
+BOLTZMANN_J_K = 1.380649e-23
+
 
 def _positive(name: str, value: float) -> float:
     value = float(value)
@@ -24,7 +27,11 @@ def _finite(name: str, value: float) -> float:
 
 
 class LinkBudget:
-    """Radio parameters shared by every link in a scenario."""
+    """Radio parameters for one direction of a link.
+
+    A graph has a default budget for every link, and can override it per pair
+    of node groups with ``ContactGraph.SetLinkBudgetFor``.
+    """
 
     __slots__ = (
         "_tx_power_w",
@@ -34,6 +41,7 @@ class LinkBudget:
         "_rx_gain_dbi",
         "_noise_psd_dbm_hz",
         "_min_rate_bps",
+        "_max_rate_bps",
     )
 
     def __init__(
@@ -46,6 +54,7 @@ class LinkBudget:
         rx_gain_dbi: float = 74.18,
         noise_psd_dbm_hz: float = -174.0,
         min_rate_bps: float = 1.0,
+        max_rate_bps: float | None = None,
     ) -> None:
         self._tx_power_w = _positive("tx_power_w", tx_power_w)
         self._frequency_hz = _positive("frequency_hz", frequency_hz)
@@ -54,6 +63,9 @@ class LinkBudget:
         self._rx_gain_dbi = _finite("rx_gain_dbi", rx_gain_dbi)
         self._noise_psd_dbm_hz = _finite("noise_psd_dbm_hz", noise_psd_dbm_hz)
         self._min_rate_bps = _positive("min_rate_bps", min_rate_bps)
+        self._max_rate_bps = None
+        if max_rate_bps is not None:
+            self._max_rate_bps = _positive("max_rate_bps", max_rate_bps)
 
 
     def GetTxPower(self) -> float:
@@ -92,6 +104,16 @@ class LinkBudget:
         self._noise_psd_dbm_hz = _finite("noise_psd_dbm_hz", dbm_per_hz)
         return self
 
+    def GetNoiseTemperature(self) -> float:
+        """Receiver system noise temperature implied by the noise PSD, kelvin."""
+        return 10.0 ** ((self._noise_psd_dbm_hz - 30.0) / 10.0) / BOLTZMANN_J_K
+
+    def SetNoiseTemperature(self, kelvin: float) -> LinkBudget:
+        """Set the noise PSD from a system noise temperature: N0 = k T."""
+        kelvin = _positive("noise_temperature_k", kelvin)
+        self._noise_psd_dbm_hz = 10.0 * np.log10(BOLTZMANN_J_K * kelvin) + 30.0
+        return self
+
     def GetFrequency(self) -> float:
         """Carrier frequency, Hz."""
         return self._frequency_hz
@@ -119,6 +141,18 @@ class LinkBudget:
         self._min_rate_bps = _positive("min_rate_bps", bps)
         return self
 
+    def GetMaxRate(self) -> float | None:
+        """Rate cap, e.g. the radio's highest supported rate, bits/s; None = no cap."""
+        return self._max_rate_bps
+
+    def SetMaxRate(self, bps: float | None) -> LinkBudget:
+        """Set the rate cap in bits/s, or None to remove it."""
+        if bps is None:
+            self._max_rate_bps = None
+        else:
+            self._max_rate_bps = _positive("max_rate_bps", bps)
+        return self
+
     def GetWavelength(self) -> float:
         """Carrier wavelength, metres."""
         return (C_KM_S * 1000.0) / self._frequency_hz
@@ -128,7 +162,8 @@ class LinkBudget:
         return self._noise_psd_dbm_hz + 10.0 * np.log10(self._bandwidth_hz)
 
     def RateBps(self, range_km: np.ndarray | float) -> np.ndarray:
-        """Shannon capacity over a free-space link of the given range(s)."""
+        """Shannon capacity over a free-space link of the given range(s),
+        capped at the max rate if one is set."""
         r_m = np.maximum(np.asarray(range_km, dtype=float) * 1000.0, 1.0)
 
         # Friis: P_rx = P_tx * G_tx * G_rx * (lambda / 4 pi R)^2
@@ -140,7 +175,10 @@ class LinkBudget:
             + self._rx_gain_dbi
         )
         snr_linear = 10.0 ** ((rx_dbm - self.GetNoisePower()) / 10.0)
-        return self._bandwidth_hz * np.log2(1.0 + snr_linear)
+        rate = self._bandwidth_hz * np.log2(1.0 + snr_linear)
+        if self._max_rate_bps is not None:
+            rate = np.minimum(rate, self._max_rate_bps)
+        return rate
 
 
     def AsDict(self) -> dict[str, float]:
@@ -153,9 +191,10 @@ class LinkBudget:
             "rx_gain_dbi": self._rx_gain_dbi,
             "noise_psd_dbm_hz": self._noise_psd_dbm_hz,
             "min_rate_bps": self._min_rate_bps,
+            "max_rate_bps": self._max_rate_bps,
         }
 
-    def __repr__(self) -> str: 
+    def __repr__(self) -> str:
         return (
             f"LinkBudget(tx_power_w={self._tx_power_w:g}, "
             f"frequency_hz={self._frequency_hz:g}, "
@@ -163,5 +202,6 @@ class LinkBudget:
             f"tx_gain_dbi={self._tx_gain_dbi:g}, "
             f"rx_gain_dbi={self._rx_gain_dbi:g}, "
             f"noise_psd_dbm_hz={self._noise_psd_dbm_hz:g}, "
-            f"min_rate_bps={self._min_rate_bps:g})"
+            f"min_rate_bps={self._min_rate_bps:g}, "
+            f"max_rate_bps={self._max_rate_bps})"
         )
